@@ -93,6 +93,11 @@
   font-weight: 600;
 }
 
+.badge-solo_visualizar {
+  background: #9e9e9e;
+  color: white;
+}
+
 .badge-no_participa {
   background: #e0e0e0;
   color: #666;
