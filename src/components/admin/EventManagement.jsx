@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getAllEvents, createEvent, updateEvent, deleteEvent, getEventParticipants, addParticipantsToEvent } from '../../services/events';
-import { getAllUsers } from '../../services/users';
+import { getAllUsers, getUserById } from '../../services/users';
 import { fileToBase64 } from '../../utils/imageUtils';
-import { Plus, Edit, Trash2, Upload, Users } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Users, UserPlus, X } from 'lucide-react';
 import './EventManagement.css';
 
 const EventManagement = () => {
@@ -25,6 +25,9 @@ const EventManagement = () => {
   });
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [eventParticipants, setEventParticipants] = useState([]);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [currentEventForParticipants, setCurrentEventForParticipants] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -100,7 +103,7 @@ const EventManagement = () => {
     }
   };
 
-  const handleEditEvent = (event) => {
+  const handleEditEvent = async (event) => {
     setEditingEvent(event);
     setFormData({
       name: event.name,
@@ -114,6 +117,22 @@ const EventManagement = () => {
       bannerURL: event.bannerURL || '',
       bannerFile: null
     });
+    
+    // Cargar participantes del evento
+    try {
+      const participants = await getEventParticipants(event.id);
+      const participantsWithData = await Promise.all(
+        participants.map(async (p) => {
+          const userData = await getUserById(p.userId);
+          return { ...p, ...userData };
+        })
+      );
+      setEventParticipants(participantsWithData);
+    } catch (error) {
+      console.error('Error cargando participantes:', error);
+      setEventParticipants([]);
+    }
+    
     setShowModal(true);
   };
 
@@ -366,6 +385,36 @@ const EventManagement = () => {
                       {user.username}
                     </label>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {editingEvent && (
+              <div className="form-group">
+                <label>Participantes del Evento</label>
+                <div className="current-participants">
+                  {eventParticipants.length === 0 ? (
+                    <p className="no-participants">No hay participantes agregados aún</p>
+                  ) : (
+                    <div className="participants-list">
+                      {eventParticipants.map(p => (
+                        <div key={p.id} className="participant-badge">
+                          <span>{p.username || p.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentEventForParticipants(editingEvent);
+                      setShowParticipantsModal(true);
+                    }}
+                    className="btn-add-participants"
+                  >
+                    <UserPlus size={16} />
+                    {eventParticipants.length === 0 ? 'Agregar Participantes' : 'Gestionar Participantes'}
+                  </button>
                 </div>
               </div>
             )}

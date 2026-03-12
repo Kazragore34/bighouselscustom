@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getActiveEvents } from '../../services/events';
+import { getActiveEvents, getAllEvents } from '../../services/events';
 import { useNavigate } from 'react-router-dom';
 import { Car, Users, Search, Trophy } from 'lucide-react';
 import './EventSelector.css';
@@ -24,8 +24,13 @@ const EventSelector = () => {
   const loadEvents = async () => {
     try {
       setLoading(true);
-      const eventsData = await getActiveEvents();
-      setEvents(eventsData);
+      // Mostrar eventos activos y draft (para que el admin pueda ver los que creó)
+      const activeEvents = await getActiveEvents();
+      // También obtener eventos draft si es necesario
+      const allEvents = await getAllEvents();
+      const draftEvents = allEvents.filter(e => e.status === 'draft');
+      // Combinar y mostrar activos primero, luego drafts
+      setEvents([...activeEvents, ...draftEvents]);
     } catch (error) {
       console.error('Error cargando eventos:', error);
     } finally {
