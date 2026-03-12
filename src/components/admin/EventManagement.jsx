@@ -346,6 +346,18 @@ const EventManagement = () => {
                   <Users size={16} />
                   Participantes
                 </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    window.location.href = `/admin/events/${event.id}/brackets`;
+                  }}
+                  className="btn-brackets"
+                  title="Editar brackets"
+                >
+                  <Trophy size={16} />
+                  Brackets
+                </button>
                 {(event.status === 'active' || event.status === 'completed') && (
                   <button
                     onClick={async (e) => {
@@ -354,7 +366,7 @@ const EventManagement = () => {
                       await handleSetWinner(event);
                     }}
                     className="btn-winner"
-                    title="Establecer ganador"
+                    title="Establecer ganador final"
                   >
                     <Trophy size={16} />
                     Ganador

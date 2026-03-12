@@ -78,38 +78,53 @@
   transform: translateX(-3px);
 }
 
+.bracket-viewer {
+  padding: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.bracket-rounds-container {
+  display: flex;
+  gap: 30px;
+  overflow-x: auto;
+  padding: 20px 0;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
 .bracket-round {
-  margin-bottom: 40px;
+  flex-shrink: 0;
+  min-width: 320px;
   position: relative;
 }
 
 .bracket-round h3 {
   color: white;
   margin-bottom: 20px;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   text-align: center;
-  padding: 10px;
+  padding: 12px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .matches-container {
   display: flex;
   flex-direction: column;
-  gap: 30px;
-  align-items: center;
-  position: relative;
+  gap: 15px;
+  align-items: stretch;
 }
 
 .match-card {
   background: white;
   border: 2px solid #e0e0e0;
   border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
   width: 100%;
-  max-width: 300px;
 }
 
 .match-card.group-match {
@@ -221,7 +236,11 @@
 }
 
 @media (max-width: 768px) {
-  .matches-container {
-    grid-template-columns: 1fr;
+  .bracket-rounds-container {
+    flex-direction: column;
+  }
+  
+  .bracket-round {
+    min-width: 100%;
   }
 }

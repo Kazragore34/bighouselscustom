@@ -287,7 +287,8 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
                     </button>
                   </div>
                   
-                  <div className="teams-container">
+                  <div className="teams-container-scroll">
+                    <div className="teams-container">
                     {teams.map((team, teamIndex) => (
                       <Droppable key={team.id} droppableId={team.id}>
                         {(provided, snapshot) => (
@@ -338,6 +339,7 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
                         )}
                       </Droppable>
                     ))}
+                    </div>
                   </div>
 
                   {/* Zona de eliminación */}

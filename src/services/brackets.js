@@ -365,8 +365,8 @@ const generateRaceBracketsPreview = (participants, maxPerGroup) => {
   return rounds;
 };
 
-// Actualizar ganador de un match
-export const updateMatchWinner = async (bracketId, matchId, winnerId) => {
+// Actualizar ganador de un match y generar siguiente ronda si es necesario
+export const updateMatchWinner = async (bracketId, matchId, winnerId, eventId) => {
   try {
     const bracketRef = doc(db, 'brackets', bracketId);
     const bracketSnap = await getDoc(bracketRef);
@@ -376,6 +376,9 @@ export const updateMatchWinner = async (bracketId, matchId, winnerId) => {
     }
 
     const bracketData = bracketSnap.data();
+    const currentRound = bracketData.round;
+    
+    // Actualizar el match con el ganador
     const matches = bracketData.matches.map(match => {
       if (match.id === matchId) {
         return {
@@ -388,6 +391,47 @@ export const updateMatchWinner = async (bracketId, matchId, winnerId) => {
     });
 
     await updateDoc(bracketRef, { matches });
+
+    // Verificar si todos los matches de esta ronda están completados
+    const allCompleted = matches.every(m => m.status === 'completed' && m.winnerId);
+    
+    if (allCompleted && matches.length > 1) {
+      // Generar siguiente ronda automáticamente
+      const winners = matches.map(m => m.winnerId).filter(Boolean);
+      
+      // Obtener datos del evento para saber el tipo de bracket
+      const { getEventById } = await import('./events');
+      const event = await getEventById(eventId);
+      const bracketType = event.bracketType || '1v1';
+      const participantsPerBracket = event.participantsPerBracket || 2;
+
+      // Crear matches para la siguiente ronda
+      const nextRoundMatches = [];
+      for (let i = 0; i < winners.length; i += participantsPerBracket) {
+        const matchParticipants = winners.slice(i, i + participantsPerBracket);
+        if (matchParticipants.length > 0) {
+          nextRoundMatches.push({
+            id: `match-${currentRound + 1}-${nextRoundMatches.length + 1}`,
+            participants: matchParticipants,
+            winnerId: null,
+            status: 'pending'
+          });
+        }
+      }
+
+      // Crear la siguiente ronda
+      if (nextRoundMatches.length > 0) {
+        const nextRoundData = {
+          eventId,
+          round: currentRound + 1,
+          matches: nextRoundMatches,
+          isFinal: nextRoundMatches.length === 1
+        };
+        
+        await createBracket(nextRoundData);
+      }
+    }
+
     return true;
   } catch (error) {
     throw error;

@@ -147,12 +147,13 @@ const BracketViewer = () => {
         </button>
       </div>
       
-      {brackets.map((bracket, bracketIndex) => (
-        <div key={bracketIndex} className="bracket-round">
-          <h3>
-            {bracket.isFinal ? '🏆 Final' : `Ronda ${bracket.round}`}
-          </h3>
-          <div className="matches-container">
+      <div className="bracket-rounds-container">
+        {brackets.map((bracket, bracketIndex) => (
+          <div key={bracketIndex} className="bracket-round">
+            <h3>
+              {bracket.isFinal ? '🏆 Final' : `Ronda ${bracket.round}`}
+            </h3>
+            <div className="matches-container">
             {bracket.matches.map((match, matchIndex) => (
               <div key={matchIndex} className={`match-card ${match.isGroup ? 'group-match' : ''} ${match.isFinal ? 'final-match' : ''}`}>
                 <div className="match-header">
@@ -203,9 +204,10 @@ const BracketViewer = () => {
                 </div>
               </div>
             ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };
