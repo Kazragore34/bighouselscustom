@@ -67,12 +67,12 @@ const VoteBetPanel = () => {
   };
 
   const handleVote = async (participantId) => {
-    // Verificar permisos (admin también puede votar)
+    // Verificar permisos - Admin puede votar, solo bloqueamos SOLO_VISUALIZAR y NO_PARTICIPA
     if (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') {
       alert('No tienes permisos para votar. Contacta al administrador.');
       return;
     }
-    // Admin puede votar también (userType === 'ADMIN' tiene permisos)
+    // Admin, PARTICIPANTE y VOTANTE_APOSTADOR pueden votar
 
     try {
       await createVote(eventId, user.id, participantId);
@@ -85,12 +85,12 @@ const VoteBetPanel = () => {
   };
 
   const handleBet = async (participantId) => {
-    // Verificar permisos (admin también puede apostar)
+    // Verificar permisos - Admin puede apostar, solo bloqueamos SOLO_VISUALIZAR y NO_PARTICIPA
     if (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') {
       alert('No tienes permisos para apostar. Contacta al administrador.');
       return;
     }
-    // Admin puede apostar también (userType === 'ADMIN' tiene permisos)
+    // Admin, PARTICIPANTE y VOTANTE_APOSTADOR pueden apostar
 
     if (!betAmount || parseFloat(betAmount) <= 0) {
       alert('Ingrese un monto válido');

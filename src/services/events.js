@@ -19,7 +19,7 @@ export const createEvent = async (eventData) => {
     const eventsRef = collection(db, 'events');
     const newEventRef = doc(eventsRef);
     
-    // Limpiar campos undefined antes de enviar a Firestore
+    // Limpiar campos undefined y null antes de enviar a Firestore
     const cleanData = Object.fromEntries(
       Object.entries({
         ...eventData,
@@ -27,7 +27,10 @@ export const createEvent = async (eventData) => {
         createdAt: serverTimestamp(),
         startDate: eventData.startDate || null,
         endDate: eventData.endDate || null
-      }).filter(([_, value]) => value !== undefined)
+      }).filter(([key, value]) => {
+        // Eliminar bannerFile explícitamente y cualquier campo undefined
+        return key !== 'bannerFile' && value !== undefined;
+      })
     );
     
     await setDoc(newEventRef, cleanData);
@@ -98,9 +101,12 @@ export const updateEvent = async (eventId, updates) => {
   try {
     const eventRef = doc(db, 'events', eventId);
     
-    // Limpiar campos undefined antes de enviar a Firestore
+    // Limpiar campos undefined y null antes de enviar a Firestore
     const cleanUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
+      Object.entries(updates).filter(([key, value]) => {
+        // Eliminar bannerFile explícitamente y cualquier campo undefined
+        return key !== 'bannerFile' && value !== undefined;
+      })
     );
     
     await updateDoc(eventRef, cleanUpdates);

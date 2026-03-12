@@ -80,8 +80,10 @@ const EventManagement = () => {
         }
       }
 
-      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined)
+      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined ni null)
       const { bannerFile, ...eventData } = formData;
+      // Asegurarse de que bannerFile no esté en el objeto
+      delete eventData.bannerFile;
       const eventId = await createEvent(eventData);
 
       // Agregar participantes si se seleccionaron
@@ -117,8 +119,10 @@ const EventManagement = () => {
 
   const handleUpdateEvent = async () => {
     try {
-      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined)
+      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined ni null)
       const { bannerFile, ...eventData } = formData;
+      // Asegurarse de que bannerFile no esté en el objeto
+      delete eventData.bannerFile;
       await updateEvent(editingEvent.id, eventData);
 
       alert('Evento actualizado exitosamente');
