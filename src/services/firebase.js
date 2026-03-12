@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+// Storage removido - usando base64 y URLs directas en su lugar
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,7 +17,7 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore
 export const db = getFirestore(app);
 
-// Initialize Storage
-export const storage = getStorage(app);
+// Storage no se usa - el plan gratuito no lo incluye
+// Usamos base64 para imágenes pequeñas y URLs directas para imágenes grandes
 
 export default app;

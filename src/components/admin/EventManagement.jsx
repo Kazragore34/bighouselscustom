@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllEvents, createEvent, updateEvent, deleteEvent, getEventParticipants, addParticipantsToEvent } from '../../services/events';
 import { getAllUsers } from '../../services/users';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../services/firebase';
+import { fileToBase64 } from '../../utils/imageUtils';
 import { Plus, Edit, Trash2, Upload, Users } from 'lucide-react';
 import './EventManagement.css';
 
@@ -21,6 +20,7 @@ const EventManagement = () => {
     houseCommission: 10,
     icon: 'trophy',
     status: 'draft',
+    bannerURL: '',
     bannerFile: null
   });
   const [selectedParticipants, setSelectedParticipants] = useState([]);
@@ -46,41 +46,42 @@ const EventManagement = () => {
     }
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFormData({ ...formData, bannerFile: file });
+      // Validar tamaño (máximo 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('La imagen es muy grande. Máximo 2MB.');
+        return;
+      }
+      
+      try {
+        setUploading(true);
+        // Convertir a base64
+        const base64 = await fileToBase64(file);
+        setFormData({ ...formData, bannerURL: base64, bannerFile: file });
+      } catch (error) {
+        alert('Error al procesar la imagen');
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
-  const uploadBanner = async (file) => {
-    if (!file) return null;
-    
-    try {
-      setUploading(true);
-      const storageRef = ref(storage, `event-banners/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-      return downloadURL;
-    } catch (error) {
-      console.error('Error subiendo banner:', error);
-      throw error;
-    } finally {
-      setUploading(false);
-    }
+  const handleUrlChange = (e) => {
+    setFormData({ ...formData, bannerURL: e.target.value, bannerFile: null });
   };
 
   const handleCreateEvent = async () => {
     try {
-      let bannerURL = '';
-      
-      if (formData.bannerFile) {
-        bannerURL = await uploadBanner(formData.bannerFile);
+      if (!formData.bannerURL) {
+        if (!confirm('¿Crear evento sin banner?')) {
+          return;
+        }
       }
 
       const eventId = await createEvent({
         ...formData,
-        bannerURL,
         bannerFile: undefined
       });
 
@@ -109,6 +110,7 @@ const EventManagement = () => {
       houseCommission: event.houseCommission || 10,
       icon: event.icon || 'trophy',
       status: event.status || 'draft',
+      bannerURL: event.bannerURL || '',
       bannerFile: null
     });
     setShowModal(true);
@@ -116,15 +118,8 @@ const EventManagement = () => {
 
   const handleUpdateEvent = async () => {
     try {
-      let bannerURL = editingEvent.bannerURL;
-      
-      if (formData.bannerFile) {
-        bannerURL = await uploadBanner(formData.bannerFile);
-      }
-
       await updateEvent(editingEvent.id, {
         ...formData,
-        bannerURL,
         bannerFile: undefined
       });
 
@@ -160,6 +155,7 @@ const EventManagement = () => {
       houseCommission: 10,
       icon: 'trophy',
       status: 'draft',
+      bannerURL: '',
       bannerFile: null
     });
     setSelectedParticipants([]);
@@ -316,20 +312,36 @@ const EventManagement = () => {
             </div>
 
             <div className="form-group">
-              <label>Banner del Evento</label>
-              <div className="file-upload">
+              <label>Banner del Evento (URL o subir imagen)</label>
+              <div className="banner-input-group">
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
+                  type="text"
+                  value={formData.bannerURL}
+                  onChange={handleUrlChange}
+                  placeholder="Pega la URL de la imagen aquí"
+                  className="banner-url-input"
                 />
-                {formData.bannerFile && (
-                  <span className="file-name">{formData.bannerFile.name}</span>
-                )}
-                {editingEvent && editingEvent.bannerURL && !formData.bannerFile && (
-                  <span className="file-name">Banner actual: {editingEvent.bannerURL.substring(0, 50)}...</span>
-                )}
+                <span className="or-divider">O</span>
+                <div className="file-upload">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                  />
+                  {formData.bannerFile && (
+                    <span className="file-name">✓ {formData.bannerFile.name}</span>
+                  )}
+                </div>
               </div>
+              {formData.bannerURL && (
+                <div className="banner-preview">
+                  <img src={formData.bannerURL} alt="Preview" />
+                </div>
+              )}
+              <p className="help-text">
+                💡 Puedes usar una URL de imagen o subir una imagen (se convertirá a base64, máximo 2MB)
+              </p>
             </div>
 
             {!editingEvent && (

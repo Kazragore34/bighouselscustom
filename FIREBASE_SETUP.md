@@ -74,12 +74,17 @@ service cloud.firestore {
 
 **Nota**: Las reglas anteriores requieren que el usuario esté autenticado. Como estamos usando autenticación personalizada, necesitarás ajustar las reglas según tu implementación específica o usar Firebase Admin SDK en el backend.
 
-## Paso 4: Configurar Storage
+## Paso 4: Storage (OPCIONAL - No necesario)
 
+**Nota**: El plan gratuito de Firebase no incluye Storage. Este proyecto funciona sin él usando:
+- **Base64** para imágenes pequeñas (fotos de perfil, banners pequeños)
+- **URLs directas** para imágenes grandes (puedes subirlas a Imgur, Cloudinary, etc.)
+
+Si tienes un plan de pago y quieres usar Storage:
 1. En el menú lateral, ve a **Storage**
 2. Haz clic en **Empezar**
 3. Acepta los términos y condiciones
-4. Selecciona las reglas de seguridad (puedes usar las predeterminadas por ahora)
+4. Selecciona las reglas de seguridad
 
 ## Paso 5: Agregar Aplicación Web
 
@@ -162,9 +167,9 @@ Las siguientes colecciones se crearán automáticamente cuando uses la aplicaci�
 - Verifica que el usuario tenga los permisos necesarios
 
 ### Las imágenes no se cargan
-- Verifica que Storage esté habilitado
-- Revisa las reglas de Storage
-- Asegúrate de que las URLs de las imágenes sean públicas o que tengas permisos de lectura
+- Si usas URLs directas, verifica que sean públicas y accesibles
+- Si usas base64, verifica que la imagen no sea muy grande (máximo 2MB para banners, 1MB para fotos)
+- Puedes usar servicios gratuitos como Imgur, Cloudinary, o ImgBB para alojar imágenes
 
 ## Próximos Pasos
 

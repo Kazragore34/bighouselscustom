@@ -3,8 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getUserById, updateUserPhoto } from '../../services/users';
 import { getBetsByUser } from '../../services/bets';
 import { getVotesByUser } from '../../services/votes';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../services/firebase';
+import { fileToBase64 } from '../../utils/imageUtils';
 import { Upload, Award, History, DollarSign, Heart } from 'lucide-react';
 import './Profile.css';
 
@@ -50,17 +49,22 @@ const Profile = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Validar tamaño (máximo 1MB para fotos de perfil)
+    if (file.size > 1024 * 1024) {
+      alert('La imagen es muy grande. Máximo 1MB.');
+      return;
+    }
+
     try {
       setUploading(true);
-      const storageRef = ref(storage, `user-photos/${user.id}_${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      // Convertir a base64
+      const base64 = await fileToBase64(file);
       
-      await updateUserPhoto(user.id, downloadURL);
-      setUserData({ ...userData, photoURL: downloadURL });
+      await updateUserPhoto(user.id, base64);
+      setUserData({ ...userData, photoURL: base64 });
       alert('Foto actualizada exitosamente');
     } catch (error) {
-      alert('Error al subir foto: ' + error.message);
+      alert('Error al procesar la imagen: ' + error.message);
     } finally {
       setUploading(false);
     }
