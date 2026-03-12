@@ -216,6 +216,29 @@ const EventManagement = () => {
                   <Edit size={16} />
                   Editar
                 </button>
+                <button 
+                  onClick={async () => {
+                    try {
+                      const participants = await getEventParticipants(event.id);
+                      const participantsWithData = await Promise.all(
+                        participants.map(async (p) => {
+                          const userData = await getUserById(p.userId);
+                          return { ...p, ...userData };
+                        })
+                      );
+                      setEventParticipants(participantsWithData);
+                      setCurrentEventForParticipants(event);
+                      setShowParticipantsModal(true);
+                    } catch (error) {
+                      alert('Error cargando participantes: ' + error.message);
+                    }
+                  }}
+                  className="btn-participants"
+                  title="Gestionar participantes"
+                >
+                  <Users size={16} />
+                  Participantes
+                </button>
                 <button onClick={() => handleDeleteEvent(event.id)} className="btn-delete">
                   <Trash2 size={16} />
                   Eliminar
@@ -430,6 +453,95 @@ const EventManagement = () => {
               >
                 {uploading ? 'Subiendo...' : editingEvent ? 'Actualizar' : 'Crear'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para gestionar participantes */}
+      {showParticipantsModal && currentEventForParticipants && (
+        <div className="modal-overlay" onClick={() => { setShowParticipantsModal(false); setCurrentEventForParticipants(null); setSelectedParticipants([]); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Gestionar Participantes - {currentEventForParticipants.name}</h2>
+            
+            <div className="participants-management">
+              <div className="current-participants-section">
+                <h3>Participantes Actuales ({eventParticipants.length})</h3>
+                {eventParticipants.length === 0 ? (
+                  <p className="no-participants">No hay participantes agregados aún</p>
+                ) : (
+                  <div className="participants-list">
+                    {eventParticipants.map(p => (
+                      <div key={p.id} className="participant-badge">
+                        <span>{p.username || p.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Agregar Participantes</label>
+                <div className="participants-selector">
+                  {users.filter(u => !eventParticipants.find(p => p.userId === u.id)).map(user => (
+                    <label key={user.id} className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={selectedParticipants.includes(user.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedParticipants([...selectedParticipants, user.id]);
+                          } else {
+                            setSelectedParticipants(selectedParticipants.filter(id => id !== user.id));
+                          }
+                        }}
+                      />
+                      {user.username}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  onClick={async () => {
+                    if (selectedParticipants.length > 0) {
+                      try {
+                        await addParticipantsToEvent(currentEventForParticipants.id, selectedParticipants);
+                        alert('Participantes agregados exitosamente');
+                        // Recargar participantes
+                        const participants = await getEventParticipants(currentEventForParticipants.id);
+                        const participantsWithData = await Promise.all(
+                          participants.map(async (p) => {
+                            const userData = await getUserById(p.userId);
+                            return { ...p, ...userData };
+                          })
+                        );
+                        setEventParticipants(participantsWithData);
+                        setSelectedParticipants([]);
+                        loadData(); // Recargar lista de eventos
+                      } catch (error) {
+                        alert('Error al agregar participantes: ' + error.message);
+                      }
+                    }
+                  }}
+                  className="btn-save"
+                  disabled={selectedParticipants.length === 0}
+                >
+                  <UserPlus size={16} />
+                  Agregar {selectedParticipants.length > 0 ? `(${selectedParticipants.length})` : ''}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowParticipantsModal(false);
+                    setCurrentEventForParticipants(null);
+                    setSelectedParticipants([]);
+                  }}
+                  className="btn-cancel"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
