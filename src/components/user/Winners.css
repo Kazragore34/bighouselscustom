@@ -14,12 +14,8 @@
   align-items: center;
   justify-content: center;
   gap: 15px;
-  color: #333;
+  color: #e0e0e0;
   font-size: 2.5rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 .event-filter {
@@ -32,8 +28,9 @@
 
 .event-filter button {
   padding: 10px 20px;
-  border: 2px solid #e0e0e0;
-  background: white;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -41,8 +38,9 @@
 }
 
 .event-filter button:hover {
-  border-color: #667eea;
+  border-color: rgba(102, 126, 234, 0.6);
   transform: translateY(-2px);
+  background: rgba(102, 126, 234, 0.2);
 }
 
 .event-filter button.active {
@@ -51,26 +49,70 @@
   border-color: transparent;
 }
 
-.winners-list {
+.winners-content {
   display: flex;
   flex-direction: column;
+  gap: 40px;
+  margin-top: 30px;
+}
+
+.winners-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 30px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.section-header h2 {
+  margin: 0;
+  color: #e0e0e0;
+  font-size: 1.8rem;
+}
+
+.section-icon {
+  color: #ffd700;
+}
+
+.winners-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
 }
 
 .winner-card {
-  background: white;
-  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   gap: 20px;
   transition: all 0.3s ease;
+  border: 1px solid rgba(102, 126, 234, 0.3);
 }
 
 .winner-card:hover {
-  transform: translateX(10px);
-  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  border-color: rgba(102, 126, 234, 0.6);
+}
+
+.winner-card-gold {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 193, 7, 0.1) 100%);
+  border-color: rgba(255, 215, 0, 0.4);
+}
+
+.winner-card-gold:hover {
+  border-color: rgba(255, 215, 0, 0.7);
+  box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3);
 }
 
 .winner-rank {
@@ -95,7 +137,7 @@
 .rank-number {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #666;
+  color: #999;
 }
 
 .winner-info {
@@ -111,6 +153,7 @@
   border-radius: 50%;
   overflow: hidden;
   border: 3px solid #667eea;
+  flex-shrink: 0;
 }
 
 .winner-photo img {
@@ -137,52 +180,91 @@
 
 .winner-details h3 {
   margin: 0 0 10px 0;
-  color: #333;
+  color: #e0e0e0;
   font-size: 1.3rem;
 }
 
 .winner-stats {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: #666;
+  gap: 8px;
+  color: #ffd700;
+  font-weight: 600;
   margin-bottom: 10px;
+}
+
+.winner-event-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: #b0b0b0;
+  font-size: 0.95rem;
+}
+
+.event-icon {
+  font-size: 1.2rem;
+}
+
+.event-name {
+  font-weight: 500;
+  color: #e0e0e0;
 }
 
 .badges-list {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: 10px;
 }
 
 .badge-item {
-  background: #fff3cd;
-  color: #856404;
+  background: rgba(255, 243, 205, 0.2);
+  color: #ffd700;
   padding: 4px 12px;
   border-radius: 12px;
   font-size: 0.85rem;
   font-weight: 600;
+  border: 1px solid rgba(255, 215, 0, 0.3);
 }
 
-.no-winners {
+.no-data {
   text-align: center;
   padding: 60px 20px;
-  color: #666;
+  color: #999;
 }
 
-.no-winners svg {
-  margin-bottom: 20px;
+.no-data svg {
   opacity: 0.5;
+  margin-bottom: 20px;
+}
+
+.no-data-subtitle {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 10px;
 }
 
 .loading {
   text-align: center;
   padding: 50px;
   font-size: 1.2rem;
-  color: #666;
+  color: #999;
 }
 
 @media (max-width: 768px) {
+  .winners-content {
+    gap: 30px;
+  }
+
+  .winners-section {
+    padding: 20px;
+  }
+
+  .winners-list {
+    grid-template-columns: 1fr;
+  }
+
   .winner-card {
     flex-direction: column;
     text-align: center;
