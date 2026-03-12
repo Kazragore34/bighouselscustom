@@ -14,7 +14,7 @@ const UserManagement = () => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    userType: 'VOTANTE_APOSTADOR',
+    userType: 'SOLO_VISUALIZAR',
     email: '',
     enabled: true,
     autoGeneratePassword: false
@@ -90,7 +90,7 @@ const UserManagement = () => {
     setFormData({
       username: user.username,
       password: '',
-      userType: user.userType,
+      userType: user.userType || 'SOLO_VISUALIZAR',
       email: user.email || '',
       enabled: user.enabled,
       autoGeneratePassword: false
