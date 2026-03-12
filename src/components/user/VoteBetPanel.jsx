@@ -209,7 +209,17 @@ const VoteBetPanel = () => {
 
   return (
     <div className="vote-bet-panel">
-      <h2>Participantes</h2>
+      <div className="panel-header">
+        <h2>Participantes</h2>
+        <button
+          onClick={() => navigate(`/events/${eventId}/brackets`)}
+          className="btn-view-brackets"
+          title="Ver brackets del evento"
+        >
+          <GitBranch size={18} />
+          Ver Brackets
+        </button>
+      </div>
       
       {/* Mostrar fecha límite si existe */}
       {eventData && eventData.betDeadline && (
