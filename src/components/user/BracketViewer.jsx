@@ -16,6 +16,13 @@ const BracketViewer = () => {
 
   useEffect(() => {
     loadBrackets();
+    
+    // Actualizar brackets cada 5 segundos para ver ganadores en tiempo real
+    const interval = setInterval(() => {
+      loadBrackets();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [eventId]);
 
   const loadBrackets = async () => {
@@ -54,13 +61,22 @@ const BracketViewer = () => {
 
       setBrackets(bracketsData);
 
-      // Cargar información de participantes
+      // Cargar información de participantes (incluyendo ganadores de matches anteriores)
       const participantIds = new Set();
       bracketsData.forEach(bracket => {
         if (bracket.matches && Array.isArray(bracket.matches)) {
           bracket.matches.forEach(match => {
             if (match.participants && Array.isArray(match.participants)) {
-              match.participants.forEach(id => participantIds.add(id));
+              match.participants.forEach(id => {
+                // Manejar placeholders de ganadores de grupos
+                if (!id.startsWith('winner-group-')) {
+                  participantIds.add(id);
+                }
+              });
+            }
+            // Agregar ganadores también
+            if (match.winnerId) {
+              participantIds.add(match.winnerId);
             }
           });
         }
@@ -175,32 +191,80 @@ const BracketViewer = () => {
                   {match.participants.map((participantId, pIndex) => {
                     // Manejar placeholders para ganadores de grupos
                     if (participantId.startsWith('winner-group-')) {
+                      // Buscar el ganador real del grupo anterior
+                      const groupNumber = participantId.replace('winner-group-', '');
+                      const previousRound = brackets[bracketIndex - 1];
+                      let actualWinner = null;
+                      
+                      if (previousRound && previousRound.matches) {
+                        const groupMatch = previousRound.matches[parseInt(groupNumber) - 1];
+                        if (groupMatch && groupMatch.winnerId) {
+                          actualWinner = groupMatch.winnerId;
+                        }
+                      }
+                      
                       return (
-                        <div key={participantId} className="participant placeholder">
+                        <div key={participantId} className={`participant placeholder ${actualWinner ? 'has-winner' : ''}`}>
                           <div className="participant-name">
-                            Ganador {participantId.replace('winner-group-', 'Grupo ')}
+                            {actualWinner ? (
+                              <>
+                                <Trophy size={14} className="trophy-icon-small" />
+                                {getParticipantName(actualWinner)}
+                              </>
+                            ) : (
+                              `Ganador ${participantId.replace('winner-group-', 'Grupo ')}`
+                            )}
                           </div>
                         </div>
                       );
                     }
                     
+                    const isWinner = match.winnerId === participantId;
+                    const participant = participants[participantId];
+                    
                     return (
                       <div
                         key={participantId}
-                        className={`participant ${match.winnerId === participantId ? 'winner' : ''}`}
+                        className={`participant ${isWinner ? 'winner' : ''} ${match.status === 'completed' && !isWinner ? 'eliminated' : ''}`}
                       >
-                        <div className="participant-name">
-                          {getParticipantName(participantId)}
+                        <div className="participant-info-row">
+                          {participant?.photoURL ? (
+                            <img src={participant.photoURL} alt={participant.username} className="participant-photo-bracket" />
+                          ) : (
+                            <div className="participant-photo-placeholder-bracket">
+                              {participant?.username?.charAt(0).toUpperCase() || '?'}
+                            </div>
+                          )}
+                          <div className="participant-name">
+                            {getParticipantName(participantId)}
+                          </div>
                         </div>
-                        {match.winnerId === participantId && (
-                          <Trophy size={16} className="trophy-icon" />
+                        {isWinner && (
+                          <div className="winner-indicator">
+                            <Trophy size={18} className="trophy-icon" />
+                            <span>Ganador</span>
+                          </div>
+                        )}
+                        {match.status === 'completed' && !isWinner && (
+                          <div className="eliminated-indicator">
+                            Eliminado
+                          </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
                 <div className={`match-status ${match.status}`}>
-                  {match.status === 'completed' ? 'Completado' : 'Pendiente'}
+                  {match.status === 'completed' ? (
+                    <span className="status-completed">
+                      <Trophy size={14} />
+                      Completado
+                    </span>
+                  ) : (
+                    <span className="status-pending">
+                      ⏳ Pendiente
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

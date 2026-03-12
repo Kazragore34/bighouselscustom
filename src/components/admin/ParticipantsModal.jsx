@@ -45,6 +45,14 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
       );
       setEventParticipants(participantsWithData);
 
+      // Si es evento por equipos, agrupar participantes existentes en equipos
+      if (isTeamEvent) {
+        const existingTeams = groupParticipantsIntoTeams(participantsWithData, requiredMembers);
+        if (existingTeams.length > 0) {
+          setTeams(existingTeams);
+        }
+      }
+
       // Si es evento por equipos, cargar equipos disponibles
       if (event.bracketType === '2v2' || event.bracketType === 'custom') {
         const requiredMembers = event.participantsPerBracket || 2;
@@ -86,8 +94,15 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
     return teams;
   };
 
+  // Filtrar usuarios que ya están en equipos o asignados
+  const assignedUserIds = new Set();
+  teams.forEach(team => {
+    team.members.forEach(userId => assignedUserIds.add(userId));
+  });
+  eventParticipants.forEach(p => assignedUserIds.add(p.userId));
+
   const filteredUsers = users.filter(u =>
-    !eventParticipants.find(p => p.userId === u.id) &&
+    !assignedUserIds.has(u.id) &&
     (u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
      u.name?.toLowerCase().includes(searchTerm.toLowerCase()))
   );

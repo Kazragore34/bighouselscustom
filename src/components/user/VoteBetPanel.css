@@ -421,12 +421,23 @@
 
 .brackets-preview {
   margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
 }
 
-.brackets-preview h4 {
+.preview-round {
+  margin-bottom: 20px;
+}
+
+.preview-round h4 {
   color: #e0e0e0;
   margin-bottom: 15px;
   font-size: 1.2rem;
+  padding: 10px;
+  background: rgba(102, 126, 234, 0.2);
+  border-radius: 8px;
+  text-align: center;
 }
 
 .preview-matches-grid {
@@ -443,6 +454,12 @@
   transition: all 0.3s ease;
 }
 
+.preview-match-card.has-winner {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
 .preview-match-card:hover {
   border-color: rgba(102, 126, 234, 0.6);
   transform: translateY(-2px);
@@ -450,10 +467,25 @@
 }
 
 .preview-match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-weight: 600;
   color: #667eea;
   margin-bottom: 12px;
   font-size: 0.9rem;
+}
+
+.preview-winner-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffd700;
+  color: #333;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
 }
 
 .preview-match-participants {
@@ -469,6 +501,27 @@
   padding: 8px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.preview-participant.winner {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: #ffd700;
+  font-weight: 600;
+}
+
+.preview-trophy {
+  color: #ff9800;
+  flex-shrink: 0;
+}
+
+.preview-match-status {
+  margin-top: 10px;
+  text-align: center;
+  color: #4caf50;
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .preview-participant-photo {

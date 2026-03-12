@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getEventParticipants, getEventById } from '../../services/events';
+import { getBracketsByEvent } from '../../services/brackets';
 import { generatePreviewBrackets } from '../../services/brackets';
 import { getUserById } from '../../services/users';
 import { createVote, hasUserVoted, getVoteCountsByEvent } from '../../services/votes';
@@ -37,7 +38,38 @@ const VoteBetPanel = () => {
         loadData();
       });
     }
+    
+    // Actualizar brackets cada 5 segundos para ver ganadores en tiempo real
+    const interval = setInterval(() => {
+      if (user && user.id && eventId) {
+        loadBracketsPreview();
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [eventId, user?.id]);
+
+  const loadBracketsPreview = async () => {
+    try {
+      // Intentar cargar brackets oficiales
+      const officialBrackets = await getBracketsByEvent(eventId);
+      if (officialBrackets.length > 0) {
+        setPreviewBrackets(officialBrackets);
+        return;
+      }
+      
+      // Si no hay oficiales, regenerar preview
+      if (participants.length > 0) {
+        const event = await getEventById(eventId);
+        const bracketType = event.bracketType || '1v1';
+        const participantsPerBracket = event.participantsPerBracket || 2;
+        const preview = generatePreviewBrackets(participants, bracketType, participantsPerBracket);
+        setPreviewBrackets(preview);
+      }
+    } catch (error) {
+      console.error('Error actualizando brackets:', error);
+    }
+  };
 
   const loadData = async () => {
     if (!user || !user.id || !eventId) {
@@ -404,39 +436,65 @@ const VoteBetPanel = () => {
             Vista previa basada en los {participants.length} participantes actuales del evento.
           </p>
           
-          {/* Mostrar preview de la primera ronda */}
+          {/* Mostrar preview de todas las rondas */}
           <div className="brackets-preview">
-            <h4>Ronda 1 - Preview</h4>
-            <div className="preview-matches-grid">
-              {previewBrackets[0].matches.map((match, matchIndex) => (
-                <div key={matchIndex} className="preview-match-card">
-                  <div className="preview-match-header">
-                    <span>Match {matchIndex + 1}</span>
-                  </div>
-                  <div className="preview-match-participants">
-                    {match.participants.map((participantId, pIndex) => {
-                      const participant = participants.find(p => p.userId === participantId);
-                      return (
-                        <div key={participantId} className="preview-participant">
-                          <div className="preview-participant-photo">
-                            {participant?.photoURL ? (
-                              <img src={participant.photoURL} alt={participant.username} />
-                            ) : (
-                              <div className="preview-photo-placeholder">
-                                {participant?.username?.charAt(0).toUpperCase() || '?'}
-                              </div>
-                            )}
-                          </div>
-                          <span className="preview-participant-name">
-                            {participant?.username || participantId}
+            {previewBrackets.map((bracket, bracketIndex) => (
+              <div key={bracketIndex} className="preview-round">
+                <h4>
+                  {bracket.isFinal ? '🏆 Final' : `Ronda ${bracket.round || bracketIndex + 1}`}
+                </h4>
+                <div className="preview-matches-grid">
+                  {bracket.matches.map((match, matchIndex) => (
+                    <div key={matchIndex} className={`preview-match-card ${match.winnerId ? 'has-winner' : ''}`}>
+                      <div className="preview-match-header">
+                        <span>
+                          {match.isGroup ? `Grupo ${matchIndex + 1}` : match.isFinal ? '🏆 Final' : `Match ${matchIndex + 1}`}
+                        </span>
+                        {match.winnerId && (
+                          <span className="preview-winner-badge">
+                            <Trophy size={12} />
+                            Ganador
                           </span>
+                        )}
+                      </div>
+                      <div className="preview-match-participants">
+                        {match.participants.map((participantId, pIndex) => {
+                          const participant = participants.find(p => p.userId === participantId);
+                          const isWinner = match.winnerId === participantId;
+                          return (
+                            <div 
+                              key={participantId} 
+                              className={`preview-participant ${isWinner ? 'winner' : ''}`}
+                            >
+                              <div className="preview-participant-photo">
+                                {participant?.photoURL ? (
+                                  <img src={participant.photoURL} alt={participant.username} />
+                                ) : (
+                                  <div className="preview-photo-placeholder">
+                                    {participant?.username?.charAt(0).toUpperCase() || '?'}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="preview-participant-name">
+                                {participant?.username || participantId}
+                              </span>
+                              {isWinner && (
+                                <Trophy size={14} className="preview-trophy" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {match.status === 'completed' && (
+                        <div className="preview-match-status">
+                          ✓ Completado
                         </div>
-                      );
-                    })}
-                  </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
