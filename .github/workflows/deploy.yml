@@ -1,0 +1,31 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Build
+      run: npm run build
+    
+    - name: Deploy
+      # Aquí agregarías los comandos para subir la carpeta dist a tu servidor
+      # Por ejemplo, usando FTP, SSH, o el servicio que uses
+      run: |
+        echo "Build completado. Archivos en carpeta dist/"
+        ls -la dist/
