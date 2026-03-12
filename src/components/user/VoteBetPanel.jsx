@@ -375,26 +375,63 @@ const VoteBetPanel = () => {
         })}
       </div>
 
-      {/* Sección de Brackets - Mostrar siempre, incluso si no hay brackets */}
-      <div className="brackets-section">
-        <div className="brackets-section-header">
-          <h3>📊 Brackets del Evento</h3>
-          <button
-            onClick={() => {
-              console.log('Navegando a brackets para evento:', eventId);
-              navigate(`/events/${eventId}/brackets`);
-            }}
-            className="btn-view-brackets-inline"
-            title="Ver brackets completos del evento"
-          >
-            <GitBranch size={18} />
-            Ver Brackets Completos
-          </button>
+      {/* Sección de Brackets - Mostrar preview en tiempo real */}
+      {previewBrackets.length > 0 && previewBrackets[0].matches.length > 0 && (
+        <div className="brackets-section">
+          <div className="brackets-section-header">
+            <h3>📊 Vista Previa de Brackets</h3>
+            <button
+              onClick={() => {
+                console.log('Navegando a brackets para evento:', eventId);
+                navigate(`/events/${eventId}/brackets`);
+              }}
+              className="btn-view-brackets-inline"
+              title="Ver brackets completos del evento"
+            >
+              <GitBranch size={18} />
+              Ver Brackets Completos
+            </button>
+          </div>
+          <p className="brackets-info">
+            Vista previa basada en los {participants.length} participantes actuales del evento.
+          </p>
+          
+          {/* Mostrar preview de la primera ronda */}
+          <div className="brackets-preview">
+            <h4>Ronda 1 - Preview</h4>
+            <div className="preview-matches-grid">
+              {previewBrackets[0].matches.map((match, matchIndex) => (
+                <div key={matchIndex} className="preview-match-card">
+                  <div className="preview-match-header">
+                    <span>Match {matchIndex + 1}</span>
+                  </div>
+                  <div className="preview-match-participants">
+                    {match.participants.map((participantId, pIndex) => {
+                      const participant = participants.find(p => p.userId === participantId);
+                      return (
+                        <div key={participantId} className="preview-participant">
+                          <div className="preview-participant-photo">
+                            {participant?.photoURL ? (
+                              <img src={participant.photoURL} alt={participant.username} />
+                            ) : (
+                              <div className="preview-photo-placeholder">
+                                {participant?.username?.charAt(0).toUpperCase() || '?'}
+                              </div>
+                            )}
+                          </div>
+                          <span className="preview-participant-name">
+                            {participant?.username || participantId}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <p className="brackets-info">
-          Visualiza la estructura de brackets y el progreso de las rondas del evento.
-        </p>
-      </div>
+      )}
 
       <PaymentModal
         isOpen={showPaymentModal}
