@@ -40,33 +40,29 @@ const Profile = () => {
         return;
       }
 
-      let userInfo;
+      console.log('Cargando perfil para usuario:', user);
+      let userInfo = null;
       
-      // Si tenemos ID, intentar obtener por ID
+      // Estrategia 1: Intentar por ID si existe
       if (user.id) {
         try {
+          console.log('Intentando obtener por ID:', user.id);
           userInfo = await getUserById(user.id);
+          console.log('Usuario obtenido por ID:', userInfo);
         } catch (error) {
-          console.log('Error obteniendo por ID, intentando por email/username:', error);
+          console.warn('Error obteniendo por ID, intentando por email/username:', error.message);
           userInfo = null;
         }
       }
 
-      // Si no funcionó por ID, buscar por email o username
-      if (!userInfo) {
+      // Estrategia 2: Buscar por email (prioritario para Google Auth)
+      if (!userInfo && user.email) {
         try {
+          console.log('Buscando por email:', user.email);
           const usersRef = collection(db, 'users');
-          let q;
-          
-          if (user.email) {
-            q = query(usersRef, where('email', '==', user.email));
-          } else if (user.username) {
-            q = query(usersRef, where('username', '==', user.username));
-          } else {
-            throw new Error('No hay email ni username disponible');
-          }
-          
+          const q = query(usersRef, where('email', '==', user.email));
           const querySnapshot = await getDocs(q);
+          
           if (!querySnapshot.empty) {
             const userDoc = querySnapshot.docs[0];
             const userDataFromDoc = userDoc.data();
@@ -75,38 +71,81 @@ const Profile = () => {
               id: userDoc.id,
               ...userWithoutPassword
             };
-          } else {
-            throw new Error('Usuario no encontrado en Firestore');
+            console.log('Usuario encontrado por email:', userInfo);
           }
         } catch (error) {
-          console.error('Error buscando usuario:', error);
-          throw error;
+          console.error('Error buscando por email:', error);
         }
       }
 
-      // Si tenemos userInfo, cargar datos adicionales
+      // Estrategia 3: Buscar por username si no hay email
+      if (!userInfo && user.username && !user.email) {
+        try {
+          console.log('Buscando por username:', user.username);
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('username', '==', user.username));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userDataFromDoc = userDoc.data();
+            const { password: _, ...userWithoutPassword } = userDataFromDoc;
+            userInfo = {
+              id: userDoc.id,
+              ...userWithoutPassword
+            };
+            console.log('Usuario encontrado por username:', userInfo);
+          }
+        } catch (error) {
+          console.error('Error buscando por username:', error);
+        }
+      }
+
+      // Si encontramos el usuario, cargar datos adicionales
       if (userInfo && userInfo.id) {
-        const [betsData, votesData] = await Promise.all([
-          getBetsByUser(userInfo.id).catch(() => []),
-          getVotesByUser(userInfo.id).catch(() => [])
-        ]);
-        
-        setUserData(userInfo);
-        setEditData({ name: userInfo.name || '', email: userInfo.email || '' });
-        setBets(betsData);
-        setVotes(votesData);
-        
-        // Actualizar el usuario en el contexto si el ID cambió
-        if (userInfo.id !== user.id) {
-          const updatedUser = { ...user, id: userInfo.id };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
+        try {
+          const [betsData, votesData] = await Promise.all([
+            getBetsByUser(userInfo.id).catch((e) => {
+              console.warn('Error cargando apuestas:', e);
+              return [];
+            }),
+            getVotesByUser(userInfo.id).catch((e) => {
+              console.warn('Error cargando votos:', e);
+              return [];
+            })
+          ]);
+          
+          setUserData(userInfo);
+          setEditData({ name: userInfo.name || userInfo.username || '', email: userInfo.email || '' });
+          setBets(betsData);
+          setVotes(votesData);
+          
+          // Actualizar el usuario en localStorage si el ID cambió o no estaba
+          if (!user.id || userInfo.id !== user.id) {
+            const updatedUser = { ...user, id: userInfo.id };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            console.log('Usuario actualizado en localStorage');
+          }
+        } catch (error) {
+          console.error('Error cargando datos adicionales:', error);
+          // Aún así mostrar el perfil básico
+          setUserData(userInfo);
+          setEditData({ name: userInfo.name || userInfo.username || '', email: userInfo.email || '' });
+          setBets([]);
+          setVotes([]);
         }
       } else {
-        throw new Error('No se pudo obtener información del usuario');
+        console.error('No se pudo encontrar el usuario en Firestore');
+        console.error('Datos del usuario en contexto:', user);
+        throw new Error('Usuario no encontrado. Por favor, cierra sesión y vuelve a iniciar sesión.');
       }
     } catch (error) {
       console.error('Error cargando perfil:', error);
       setUserData(null);
+      // Mostrar error más descriptivo
+      if (error.message) {
+        alert('Error al cargar perfil: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
