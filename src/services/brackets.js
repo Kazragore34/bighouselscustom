@@ -259,17 +259,8 @@ const generateRaceBrackets = (participants, maxPerGroup) => {
 
   rounds.push(firstRoundMatches);
 
-  // Segunda ronda: final con los ganadores de cada grupo
-  if (groups.length > 1) {
-    const finalMatch = {
-      id: 'final',
-      participants: groups.map((_, index) => `winner-group-${index + 1}`), // Placeholder para ganadores
-      winnerId: null,
-      status: 'pending',
-      isFinal: true
-    };
-    rounds.push([finalMatch]);
-  }
+  // NOTA: La final se generará automáticamente cuando todos los grupos tengan ganadores
+  // mediante updateMatchWinner, no aquí
 
   return rounds;
 };
@@ -411,15 +402,31 @@ export const updateMatchWinner = async (bracketId, matchId, winnerId, eventId) =
 
       // Crear matches para la siguiente ronda
       const nextRoundMatches = [];
-      for (let i = 0; i < winners.length; i += participantsPerBracket) {
-        const matchParticipants = winners.slice(i, i + participantsPerBracket);
-        if (matchParticipants.length > 0) {
-          nextRoundMatches.push({
-            id: `match-${currentRound + 1}-${nextRoundMatches.length + 1}`,
-            participants: matchParticipants,
-            winnerId: null,
-            status: 'pending'
-          });
+      
+      // Verificar si la ronda actual tiene grupos (isGroup)
+      const isGroupRound = matches.some(m => m.isGroup);
+      
+      if (isGroupRound && winners.length > 1) {
+        // Si es una ronda de grupos completada, crear la final con todos los ganadores
+        nextRoundMatches.push({
+          id: `final-${currentRound + 1}`,
+          participants: winners,
+          winnerId: null,
+          status: 'pending',
+          isFinal: true
+        });
+      } else {
+        // Si es una ronda normal, crear matches normales
+        for (let i = 0; i < winners.length; i += participantsPerBracket) {
+          const matchParticipants = winners.slice(i, i + participantsPerBracket);
+          if (matchParticipants.length > 0) {
+            nextRoundMatches.push({
+              id: `match-${currentRound + 1}-${nextRoundMatches.length + 1}`,
+              participants: matchParticipants,
+              winnerId: null,
+              status: 'pending'
+            });
+          }
         }
       }
 
