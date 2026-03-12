@@ -212,7 +212,10 @@ const VoteBetPanel = () => {
       <div className="panel-header">
         <h2>Participantes</h2>
         <button
-          onClick={() => navigate(`/events/${eventId}/brackets`)}
+          onClick={() => {
+            console.log('Navegando a brackets para evento:', eventId);
+            navigate(`/events/${eventId}/brackets`);
+          }}
           className="btn-view-brackets"
           title="Ver brackets del evento"
         >

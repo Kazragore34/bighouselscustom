@@ -19,15 +19,21 @@ const BracketViewer = () => {
   const loadBrackets = async () => {
     try {
       setLoading(true);
+      console.log('Cargando brackets para evento:', eventId);
       const bracketsData = await getBracketsByEvent(eventId);
+      console.log('Brackets encontrados:', bracketsData);
       setBrackets(bracketsData);
 
       // Cargar información de participantes
       const participantIds = new Set();
       bracketsData.forEach(bracket => {
-        bracket.matches.forEach(match => {
-          match.participants.forEach(id => participantIds.add(id));
-        });
+        if (bracket.matches && Array.isArray(bracket.matches)) {
+          bracket.matches.forEach(match => {
+            if (match.participants && Array.isArray(match.participants)) {
+              match.participants.forEach(id => participantIds.add(id));
+            }
+          });
+        }
       });
 
       const participantsData = {};
@@ -36,12 +42,15 @@ const BracketViewer = () => {
           const userData = await getUserById(id);
           participantsData[id] = userData;
         } catch (error) {
+          console.warn('Error cargando participante:', id, error);
           participantsData[id] = { username: id };
         }
       }
       setParticipants(participantsData);
     } catch (error) {
       console.error('Error cargando brackets:', error);
+      // Mostrar mensaje de error al usuario
+      alert('Error al cargar brackets: ' + (error.message || 'Error desconocido'));
     } finally {
       setLoading(false);
     }
@@ -57,9 +66,25 @@ const BracketViewer = () => {
 
   if (brackets.length === 0) {
     return (
-      <div className="no-brackets">
-        <Trophy size={48} />
-        <p>Los brackets aún no han sido creados</p>
+      <div className="bracket-viewer">
+        <div className="bracket-header">
+          <button
+            onClick={() => navigate(`/events/${eventId}`)}
+            className="btn-back"
+            title="Volver al evento"
+          >
+            <ArrowLeft size={18} />
+            Volver al Evento
+          </button>
+          <h2>Brackets del Evento</h2>
+        </div>
+        <div className="no-brackets">
+          <Trophy size={48} />
+          <p>Los brackets aún no han sido creados</p>
+          <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '10px' }}>
+            El administrador debe crear los brackets desde el panel de administración.
+          </p>
+        </div>
       </div>
     );
   }
