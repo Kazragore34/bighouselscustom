@@ -12,13 +12,19 @@
 6. Ingresa el **email de soporte del proyecto** (puede ser tu email)
 7. Haz clic en **Guardar**
 
-### 2. Configurar Dominios Autorizados
+### 2. Configurar Dominios Autorizados ⚠️ IMPORTANTE
+
+**Este paso es CRÍTICO para que funcione en `sortia.eu`**
 
 1. En la misma página de Sign-in method > Google
-2. Haz clic en **Dominios autorizados**
-3. Agrega tu dominio:
-   - `sortia.eu`
-   - `localhost` (para desarrollo)
+2. Busca la sección **"Dominios autorizados"** o **"Authorized domains"**
+3. Haz clic en **"Agregar dominio"** o **"Add domain"**
+4. Agrega estos dominios (uno por uno):
+   - `sortia.eu` ← **OBLIGATORIO para producción**
+   - `www.sortia.eu` (si usas www)
+   - `localhost` (para desarrollo - ya debería estar)
+
+**⚠️ Si no agregas `sortia.eu`, verás el error: `auth/unauthorized-domain`**
 
 ### 3. Actualizar Reglas de Firestore
 

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getUserById, updateUserPhoto } from '../../services/users';
+import { getUserById, updateUserPhoto, updateUser } from '../../services/users';
 import { getBetsByUser } from '../../services/bets';
 import { getVotesByUser } from '../../services/votes';
 import { fileToBase64 } from '../../utils/imageUtils';
-import { Upload, Award, History, DollarSign, Heart } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { Upload, Award, History, DollarSign, Heart, Edit2, Save, X } from 'lucide-react';
 import './Profile.css';
 
 const iconMap = {
@@ -22,6 +24,8 @@ const Profile = () => {
   const [votes, setVotes] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editData, setEditData] = useState({ name: '', email: '' });
 
   useEffect(() => {
     loadProfileData();
@@ -30,16 +34,41 @@ const Profile = () => {
   const loadProfileData = async () => {
     try {
       setLoading(true);
+      if (!user || !user.id) {
+        console.error('Usuario no válido:', user);
+        return;
+      }
+      
       const [userInfo, betsData, votesData] = await Promise.all([
         getUserById(user.id),
         getBetsByUser(user.id),
         getVotesByUser(user.id)
       ]);
       setUserData(userInfo);
+      setEditData({ name: userInfo.name || '', email: userInfo.email || '' });
       setBets(betsData);
       setVotes(votesData);
     } catch (error) {
       console.error('Error cargando perfil:', error);
+      // Si el error es de permisos, intentar con el email
+      if (error.message && error.message.includes('permission')) {
+        try {
+          // Intentar buscar por email si tenemos email
+          if (user.email) {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('email', '==', user.email));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+              const userDoc = querySnapshot.docs[0];
+              const userInfo = { id: userDoc.id, ...userDoc.data() };
+              setUserData(userInfo);
+              setEditData({ name: userInfo.name || '', email: userInfo.email || '' });
+            }
+          }
+        } catch (e) {
+          console.error('Error alternativo:', e);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -68,6 +97,25 @@ const Profile = () => {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      await updateUser(user.id, {
+        name: editData.name || userData.username,
+        email: editData.email || ''
+      });
+      setUserData({ ...userData, name: editData.name, email: editData.email });
+      setEditing(false);
+      alert('Perfil actualizado exitosamente');
+    } catch (error) {
+      alert('Error al actualizar perfil: ' + error.message);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditData({ name: userData.name || '', email: userData.email || '' });
+    setEditing(false);
   };
 
   if (loading) {
@@ -109,9 +157,59 @@ const Profile = () => {
         </div>
 
         <div className="profile-info">
-          <h1>{userData.username}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1>{userData.username}</h1>
+            {!editing && (
+              <button 
+                onClick={() => setEditing(true)} 
+                className="btn-edit-profile"
+                title="Editar perfil"
+              >
+                <Edit2 size={18} />
+              </button>
+            )}
+          </div>
           <p className="user-type">{userData.userType}</p>
-          {userData.email && <p className="email">{userData.email}</p>}
+          
+          {editing ? (
+            <div className="edit-profile-form">
+              <div className="form-group">
+                <label>Nombre Completo</label>
+                <input
+                  type="text"
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  placeholder="Tu nombre completo"
+                />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={editData.email}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  placeholder="tu@email.com"
+                />
+              </div>
+              <div className="edit-actions">
+                <button onClick={handleSaveProfile} className="btn-save-profile">
+                  <Save size={16} />
+                  Guardar
+                </button>
+                <button onClick={handleCancelEdit} className="btn-cancel-profile">
+                  <X size={16} />
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {userData.name && userData.name !== userData.username && (
+                <p className="full-name">{userData.name}</p>
+              )}
+              {userData.email && <p className="email">{userData.email}</p>}
+            </>
+          )}
         </div>
       </div>
 

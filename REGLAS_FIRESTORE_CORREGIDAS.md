@@ -1,8 +1,10 @@
 # Reglas de Firestore Corregidas
 
-## ⚠️ Error: "Missing or insufficient permissions"
+## ⚠️ Problemas Solucionados
 
-Este error ocurre porque las reglas de Firestore no permiten la lectura necesaria para verificar si un usuario existe antes de crearlo.
+1. **Admin puede editar usuarios**: Los admins ahora pueden actualizar cualquier usuario
+2. **Usuarios pueden leer su propio perfil**: Todos los usuarios autenticados pueden leer su propio perfil
+3. **Usuarios pueden editar su propio perfil**: Los usuarios pueden actualizar su nombre, email y foto (pero no userType)
 
 ## ✅ Reglas Corregidas
 
@@ -19,20 +21,28 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType == 'ADMIN';
     }
     
-    // Usuarios - Permitir lectura pública solo del campo username para verificar existencia
-    // Permitir creación pública para registro
+    // Helper function para obtener el userType del usuario autenticado desde Firestore
+    function getUserType() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType;
+    }
+    
+    // Usuarios
     match /users/{userId} {
-      // Permitir lectura del campo username para verificar si existe (sin autenticación)
-      allow read: if request.resource == null || 
-                     resource.data.keys().hasOnly(['username']) ||
-                     request.auth != null;
+      // Permitir lectura: admin puede leer todos, usuarios pueden leer su propio perfil
+      allow read: if request.auth != null && 
+                     (isAdmin() || request.auth.uid == userId);
       
       // Permitir creación pública (registro)
       allow create: if true;
       
-      // Permitir actualización solo a admin o al propio usuario
-      allow update: if isAdmin() || 
-                      (request.auth != null && request.auth.uid == userId);
+      // Permitir actualización:
+      // - Admin puede actualizar cualquier usuario
+      // - Usuario puede actualizar su propio perfil (pero no userType)
+      allow update: if request.auth != null && (
+        isAdmin() || 
+        (request.auth.uid == userId && 
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userType', 'enabled']))
+      );
       
       // Permitir eliminación solo a admin
       allow delete: if isAdmin();
@@ -49,8 +59,8 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null && 
                        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType != 'SOLO_VISUALIZAR' &&
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType != 'NO_PARTICIPA';
+                       getUserType() != 'SOLO_VISUALIZAR' &&
+                       getUserType() != 'NO_PARTICIPA';
     }
     
     // Apuestas - Lectura para todos, creación para autenticados con permisos
@@ -58,8 +68,8 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null &&
                        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType != 'SOLO_VISUALIZAR' &&
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userType != 'NO_PARTICIPA';
+                       getUserType() != 'SOLO_VISUALIZAR' &&
+                       getUserType() != 'NO_PARTICIPA';
       allow update: if isAdmin();
     }
     
@@ -80,7 +90,7 @@ service cloud.firestore {
 
 ## 🔧 Alternativa Más Simple (Si la anterior no funciona)
 
-Si las reglas anteriores son muy complejas, usa esta versión simplificada:
+Si las reglas anteriores son muy complejas, usa esta versión simplificada temporalmente:
 
 ```javascript
 rules_version = '2';
@@ -103,22 +113,17 @@ service cloud.firestore {
 3. Copia y pega las reglas de arriba
 4. Haz clic en **Publicar**
 5. Espera unos segundos a que se apliquen
-6. Intenta crear una cuenta nuevamente
+6. Prueba editar un usuario desde el panel admin
 
-## 🎯 Habilitar Autenticación con Google
+## 🎯 Cambios Importantes
 
-Para que funcione el login con Google:
-
-1. Ve a Firebase Console > Authentication
-2. Haz clic en **Empezar** si es la primera vez
-3. Ve a la pestaña **Sign-in method**
-4. Haz clic en **Google**
-5. Activa el proveedor
-6. Ingresa el email de soporte del proyecto
-7. Guarda
+- ✅ Admin puede actualizar cualquier campo de cualquier usuario
+- ✅ Usuarios pueden leer su propio perfil
+- ✅ Usuarios pueden actualizar su nombre, email y foto (pero NO userType ni enabled)
+- ✅ Los usuarios SOLO_VISUALIZAR pueden editar su perfil
 
 ## ✅ Después de Configurar
 
-- El registro público debería funcionar
-- El login con Google debería funcionar
-- Los usuarios nuevos tendrán tipo `SOLO_VISUALIZAR` por defecto
+- El admin podrá editar usuarios sin errores de permisos
+- Los usuarios podrán ver y editar su propio perfil
+- El login con Google funcionará correctamente
