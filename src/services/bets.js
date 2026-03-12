@@ -72,17 +72,24 @@ export const getBetsByEvent = async (eventId) => {
 export const getPendingBets = async () => {
   try {
     const betsRef = collection(db, 'bets');
+    // Solo filtrar por status, ordenar en memoria para evitar necesidad de índice
     const q = query(
       betsRef,
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'pending')
     );
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({
+    // Ordenar en memoria por createdAt descendente
+    const bets = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    return bets.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || 0;
+      const bTime = b.createdAt?.toMillis?.() || 0;
+      return bTime - aTime; // Descendente
+    });
   } catch (error) {
     throw error;
   }
