@@ -23,10 +23,10 @@ const VoteBetPanel = () => {
   const [betAmount, setBetAmount] = useState('');
 
   useEffect(() => {
-    if (user && eventId) {
+    if (user && user.id && eventId) {
       loadData();
     }
-  }, [eventId, user]);
+  }, [eventId, user?.id]);
 
   const loadData = async () => {
     if (!user || !user.id || !eventId) {
@@ -130,10 +130,6 @@ const VoteBetPanel = () => {
     }
   };
 
-  if (loading) {
-    return <div className="loading">Cargando participantes...</div>;
-  }
-
   // Verificar permisos de forma más robusta
   const canVoteOrBet = user && user.userType && user.userType !== 'SOLO_VISUALIZAR';
   const hasNoPermissions = user && user.userType && user.userType === 'SOLO_VISUALIZAR';
@@ -145,7 +141,15 @@ const VoteBetPanel = () => {
       console.log('userType:', user.userType);
       console.log('Puede votar/apostar:', canVoteOrBet);
     }
-  }, [user, canVoteOrBet]);
+  }, [user?.id, user?.userType]);
+
+  if (!user) {
+    return <div className="loading">Cargando usuario...</div>;
+  }
+
+  if (loading) {
+    return <div className="loading">Cargando participantes...</div>;
+  }
 
   return (
     <div className="vote-bet-panel">
