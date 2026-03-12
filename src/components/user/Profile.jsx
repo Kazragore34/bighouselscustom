@@ -34,41 +34,79 @@ const Profile = () => {
   const loadProfileData = async () => {
     try {
       setLoading(true);
-      if (!user || !user.id) {
+      if (!user) {
         console.error('Usuario no válido:', user);
+        setLoading(false);
         return;
       }
+
+      let userInfo;
       
-      const [userInfo, betsData, votesData] = await Promise.all([
-        getUserById(user.id),
-        getBetsByUser(user.id),
-        getVotesByUser(user.id)
-      ]);
-      setUserData(userInfo);
-      setEditData({ name: userInfo.name || '', email: userInfo.email || '' });
-      setBets(betsData);
-      setVotes(votesData);
-    } catch (error) {
-      console.error('Error cargando perfil:', error);
-      // Si el error es de permisos, intentar con el email
-      if (error.message && error.message.includes('permission')) {
+      // Si tenemos ID, intentar obtener por ID
+      if (user.id) {
         try {
-          // Intentar buscar por email si tenemos email
-          if (user.email) {
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('email', '==', user.email));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-              const userDoc = querySnapshot.docs[0];
-              const userInfo = { id: userDoc.id, ...userDoc.data() };
-              setUserData(userInfo);
-              setEditData({ name: userInfo.name || '', email: userInfo.email || '' });
-            }
-          }
-        } catch (e) {
-          console.error('Error alternativo:', e);
+          userInfo = await getUserById(user.id);
+        } catch (error) {
+          console.log('Error obteniendo por ID, intentando por email/username:', error);
+          userInfo = null;
         }
       }
+
+      // Si no funcionó por ID, buscar por email o username
+      if (!userInfo) {
+        try {
+          const usersRef = collection(db, 'users');
+          let q;
+          
+          if (user.email) {
+            q = query(usersRef, where('email', '==', user.email));
+          } else if (user.username) {
+            q = query(usersRef, where('username', '==', user.username));
+          } else {
+            throw new Error('No hay email ni username disponible');
+          }
+          
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userDataFromDoc = userDoc.data();
+            const { password: _, ...userWithoutPassword } = userDataFromDoc;
+            userInfo = {
+              id: userDoc.id,
+              ...userWithoutPassword
+            };
+          } else {
+            throw new Error('Usuario no encontrado en Firestore');
+          }
+        } catch (error) {
+          console.error('Error buscando usuario:', error);
+          throw error;
+        }
+      }
+
+      // Si tenemos userInfo, cargar datos adicionales
+      if (userInfo && userInfo.id) {
+        const [betsData, votesData] = await Promise.all([
+          getBetsByUser(userInfo.id).catch(() => []),
+          getVotesByUser(userInfo.id).catch(() => [])
+        ]);
+        
+        setUserData(userInfo);
+        setEditData({ name: userInfo.name || '', email: userInfo.email || '' });
+        setBets(betsData);
+        setVotes(votesData);
+        
+        // Actualizar el usuario en el contexto si el ID cambió
+        if (userInfo.id !== user.id) {
+          const updatedUser = { ...user, id: userInfo.id };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+      } else {
+        throw new Error('No se pudo obtener información del usuario');
+      }
+    } catch (error) {
+      console.error('Error cargando perfil:', error);
+      setUserData(null);
     } finally {
       setLoading(false);
     }
@@ -89,7 +127,12 @@ const Profile = () => {
       // Convertir a base64
       const base64 = await fileToBase64(file);
       
-      await updateUserPhoto(user.id, base64);
+      const userId = userData?.id || user?.id;
+      if (!userId) {
+        alert('Error: No se pudo identificar el usuario');
+        return;
+      }
+      await updateUserPhoto(userId, base64);
       setUserData({ ...userData, photoURL: base64 });
       alert('Foto actualizada exitosamente');
     } catch (error) {
@@ -101,7 +144,13 @@ const Profile = () => {
 
   const handleSaveProfile = async () => {
     try {
-      await updateUser(user.id, {
+      const userId = userData?.id || user?.id;
+      if (!userId) {
+        alert('Error: No se pudo identificar el usuario');
+        return;
+      }
+
+      await updateUser(userId, {
         name: editData.name || userData.username,
         email: editData.email || ''
       });
@@ -109,6 +158,7 @@ const Profile = () => {
       setEditing(false);
       alert('Perfil actualizado exitosamente');
     } catch (error) {
+      console.error('Error actualizando perfil:', error);
       alert('Error al actualizar perfil: ' + error.message);
     }
   };
