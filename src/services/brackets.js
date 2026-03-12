@@ -167,6 +167,47 @@ export const generateSmartBrackets = async (eventId, participants, bracketType, 
   }
 };
 
+// Generar preview de brackets basado en participantes (sin guardar en Firestore)
+export const generatePreviewBrackets = (participants, participantsPerBracket = 2) => {
+  if (!participants || participants.length === 0) {
+    return [];
+  }
+
+  const bracketSize = participantsPerBracket || 2;
+  const totalBrackets = Math.ceil(participants.length / bracketSize);
+  const brackets = [];
+
+  // Mezclar participantes aleatoriamente
+  const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
+
+  // Crear estructura de brackets
+  let participantIndex = 0;
+
+  for (let i = 0; i < totalBrackets; i++) {
+    const bracket = [];
+    
+    for (let j = 0; j < bracketSize && participantIndex < shuffledParticipants.length; j++) {
+      bracket.push(shuffledParticipants[participantIndex].userId);
+      participantIndex++;
+    }
+    
+    if (bracket.length > 0) {
+      brackets.push({
+        participants: bracket,
+        winnerId: null,
+        status: 'pending'
+      });
+    }
+  }
+
+  // Retornar estructura de bracket con round
+  return [{
+    round: 1,
+    matches: brackets,
+    isFinal: totalBrackets === 1
+  }];
+};
+
 // Actualizar ganador de un match
 export const updateMatchWinner = async (bracketId, matchId, winnerId) => {
   try {

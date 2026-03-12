@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getEventParticipants, getEventById } from '../../services/events';
+import { generatePreviewBrackets } from '../../services/brackets';
 import { getUserById } from '../../services/users';
 import { createVote, hasUserVoted, getVoteCountsByEvent } from '../../services/votes';
 import { createBet } from '../../services/bets';
@@ -25,6 +26,7 @@ const VoteBetPanel = () => {
   const [betAmounts, setBetAmounts] = useState({}); // Objeto con participantId -> amount
   const [userBets, setUserBets] = useState({}); // Objeto con participantId -> array de apuestas
   const [eventData, setEventData] = useState(null); // Datos del evento para validar fecha límite
+  const [previewBrackets, setPreviewBrackets] = useState([]); // Preview de brackets basado en participantes actuales
 
   useEffect(() => {
     if (user && user.id && eventId) {
@@ -65,6 +67,12 @@ const VoteBetPanel = () => {
       );
 
       setParticipants(participantsWithData);
+
+      // Generar preview de brackets basado en participantes actuales
+      if (participantsWithData.length > 0) {
+        const preview = generatePreviewBrackets(participantsWithData, 2);
+        setPreviewBrackets(preview);
+      }
 
       // Cargar conteo de votos
       const votes = await getVoteCountsByEvent(eventId).catch(() => ({}));

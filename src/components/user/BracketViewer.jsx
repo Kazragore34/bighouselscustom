@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBracketsByEvent } from '../../services/brackets';
+import { getBracketsByEvent, generatePreviewBrackets } from '../../services/brackets';
+import { getEventParticipants } from '../../services/events';
 import { getUserById } from '../../services/users';
-import { Trophy, ArrowLeft } from 'lucide-react';
+import { Trophy, ArrowLeft, RefreshCw } from 'lucide-react';
 import './BracketViewer.css';
 
 const BracketViewer = () => {
@@ -11,6 +12,7 @@ const BracketViewer = () => {
   const [brackets, setBrackets] = useState([]);
   const [participants, setParticipants] = useState({});
   const [loading, setLoading] = useState(true);
+  const [isPreview, setIsPreview] = useState(false);
 
   useEffect(() => {
     loadBrackets();
@@ -20,8 +22,30 @@ const BracketViewer = () => {
     try {
       setLoading(true);
       console.log('Cargando brackets para evento:', eventId);
-      const bracketsData = await getBracketsByEvent(eventId);
-      console.log('Brackets encontrados:', bracketsData);
+      
+      // Primero intentar cargar brackets oficiales
+      let bracketsData = [];
+      try {
+        bracketsData = await getBracketsByEvent(eventId);
+        console.log('Brackets oficiales encontrados:', bracketsData);
+        setIsPreview(false);
+      } catch (error) {
+        console.warn('No hay brackets oficiales, generando preview:', error);
+        setIsPreview(true);
+      }
+
+      // Si no hay brackets oficiales, generar preview basado en participantes actuales
+      if (bracketsData.length === 0) {
+        const eventParticipants = await getEventParticipants(eventId);
+        console.log('Participantes del evento:', eventParticipants);
+        
+        if (eventParticipants.length > 0) {
+          // Generar preview de brackets
+          bracketsData = generatePreviewBrackets(eventParticipants, 2); // 2 participantes por bracket (1v1)
+          setIsPreview(true);
+        }
+      }
+
       setBrackets(bracketsData);
 
       // Cargar información de participantes
@@ -49,8 +73,7 @@ const BracketViewer = () => {
       setParticipants(participantsData);
     } catch (error) {
       console.error('Error cargando brackets:', error);
-      // Mostrar mensaje de error al usuario
-      alert('Error al cargar brackets: ' + (error.message || 'Error desconocido'));
+      // No mostrar alert, solo log
     } finally {
       setLoading(false);
     }
@@ -100,7 +123,22 @@ const BracketViewer = () => {
           <ArrowLeft size={18} />
           Volver al Evento
         </button>
-        <h2>Brackets del Evento</h2>
+        <div className="bracket-title-section">
+          <h2>Brackets del Evento</h2>
+          {isPreview && (
+            <span className="preview-badge">
+              📊 Vista Previa (basada en participantes actuales)
+            </span>
+          )}
+        </div>
+        <button
+          onClick={loadBrackets}
+          className="btn-refresh"
+          title="Actualizar brackets"
+        >
+          <RefreshCw size={18} />
+          Actualizar
+        </button>
       </div>
       
       {brackets.map((bracket, bracketIndex) => (
