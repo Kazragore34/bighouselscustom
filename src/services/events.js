@@ -127,28 +127,49 @@ export const deleteEvent = async (eventId) => {
   }
 };
 
-// Agregar participantes a evento
-export const addParticipantsToEvent = async (eventId, userIds) => {
+// Agregar participantes a evento (individuales o por equipos)
+export const addParticipantsToEvent = async (eventId, participants) => {
   try {
-    const batch = [];
-    
-    for (const userId of userIds) {
+    // participants puede ser array de userIds o array de objetos {userId, teamId}
+    const participantsArray = Array.isArray(participants) && participants.length > 0 && typeof participants[0] === 'string'
+      ? participants.map(userId => ({ userId }))
+      : participants;
+
+    const writePromises = participantsArray.map(async (participant) => {
       const participantRef = doc(collection(db, 'eventParticipants'));
-      batch.push({
-        id: participantRef.id,
+      await setDoc(participantRef, {
         eventId,
-        userId,
+        userId: participant.userId || null,
+        teamId: participant.teamId || null,
         enabled: true
       });
+    });
+
+    await Promise.all(writePromises);
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Agregar equipo completo a evento
+export const addTeamToEvent = async (eventId, teamId) => {
+  try {
+    const { getTeamById } = await import('./teams');
+    const team = await getTeamById(teamId);
+    
+    if (!team) {
+      throw new Error('Equipo no encontrado');
     }
 
-    // Guardar todos los participantes
-    const writePromises = batch.map(async (participant) => {
-      const participantRef = doc(db, 'eventParticipants', participant.id);
+    // Agregar cada miembro del equipo como participante con teamId
+    const writePromises = team.members.map(async (userId) => {
+      const participantRef = doc(collection(db, 'eventParticipants'));
       await setDoc(participantRef, {
-        eventId: participant.eventId,
-        userId: participant.userId,
-        enabled: participant.enabled
+        eventId,
+        userId,
+        teamId,
+        enabled: true
       });
     });
 
@@ -174,6 +195,28 @@ export const getEventParticipants = async (eventId) => {
       id: doc.id,
       ...doc.data()
     }));
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Establecer ganador del evento
+export const setEventWinner = async (eventId, winnerId, winnerTeamId = null) => {
+  try {
+    const eventRef = doc(db, 'events', eventId);
+    const updates = {};
+    
+    if (winnerTeamId) {
+      updates.winnerTeamId = winnerTeamId;
+      updates.winnerId = null;
+    } else if (winnerId) {
+      updates.winnerId = winnerId;
+      updates.winnerTeamId = null;
+    }
+    
+    updates.winnerSetAt = serverTimestamp();
+    await updateDoc(eventRef, updates);
+    return true;
   } catch (error) {
     throw error;
   }

@@ -79,7 +79,7 @@ export const updateBracket = async (bracketId, updates) => {
   }
 };
 
-// Generar brackets inteligentes
+// Generar brackets inteligentes con múltiples rondas
 export const generateSmartBrackets = async (eventId, participants, bracketType, participantsPerBracket) => {
   try {
     // Obtener votos y apuestas para detectar favoritos
@@ -90,18 +90,21 @@ export const generateSmartBrackets = async (eventId, participants, bracketType, 
     const favoriteScores = {};
     
     participants.forEach(participant => {
-      const voteCount = votes.filter(v => v.favoriteId === participant.userId).length;
+      const participantId = participant.userId || participant.teamId || participant.id;
+      const voteCount = votes.filter(v => v.favoriteId === participantId).length;
       const betAmount = bets
-        .filter(b => b.participantId === participant.userId && b.status === 'confirmed')
+        .filter(b => (b.participantId === participantId || b.teamId === participantId) && b.status === 'confirmed')
         .reduce((sum, bet) => sum + bet.amount, 0);
       
       // Score = votos * 1 + apuestas * 0.1 (ajustable)
-      favoriteScores[participant.userId] = voteCount + (betAmount * 0.1);
+      favoriteScores[participantId] = voteCount + (betAmount * 0.1);
     });
 
     // Ordenar participantes por score (mayor a menor)
     const sortedParticipants = [...participants].sort((a, b) => {
-      return (favoriteScores[b.userId] || 0) - (favoriteScores[a.userId] || 0);
+      const aId = a.userId || a.teamId || a.id;
+      const bId = b.userId || b.teamId || b.id;
+      return (favoriteScores[bId] || 0) - (favoriteScores[aId] || 0);
     });
 
     // Identificar top favoritos (20% superior)
@@ -112,100 +115,254 @@ export const generateSmartBrackets = async (eventId, participants, bracketType, 
     // Mezclar aleatoriamente el resto
     const shuffledRest = [...restParticipants].sort(() => Math.random() - 0.5);
 
-    // Distribuir favoritos en extremos opuestos
-    const bracketSize = participantsPerBracket || 2;
-    const totalBrackets = Math.ceil(participants.length / bracketSize);
-    const brackets = [];
+    // Generar todas las rondas del torneo
+    const allRounds = generateTournamentRounds(
+      sortedParticipants,
+      bracketType,
+      participantsPerBracket,
+      topFavorites,
+      shuffledRest
+    );
 
-    // Crear estructura de brackets
-    let participantIndex = 0;
-    let favoriteIndex = 0;
+    // Guardar cada ronda en Firestore
+    const bracketIds = [];
+    for (let i = 0; i < allRounds.length; i++) {
+      const roundData = {
+        eventId,
+        round: i + 1,
+        matches: allRounds[i],
+        isFinal: i === allRounds.length - 1
+      };
+      const bracketId = await createBracket(roundData);
+      bracketIds.push(bracketId);
+    }
 
-    for (let i = 0; i < totalBrackets; i++) {
-      const bracket = [];
+    return bracketIds[0]; // Retornar ID de la primera ronda
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Generar todas las rondas del torneo
+const generateTournamentRounds = (participants, bracketType, participantsPerBracket, topFavorites, shuffledRest) => {
+  const rounds = [];
+  let currentRoundParticipants = [...participants];
+  const bracketSize = participantsPerBracket || 2;
+
+  // Lógica especial para carreras con muchos participantes
+  if (bracketType === '10x10' || bracketType === 'custom') {
+    return generateRaceBrackets(participants, bracketSize);
+  }
+
+  // Para 1v1 y 2v2: eliminación directa
+  let roundNumber = 1;
+  
+  while (currentRoundParticipants.length > 1) {
+    const matches = [];
+    const nextRoundParticipants = [];
+
+    // Mezclar participantes para esta ronda (excepto primera ronda donde distribuimos favoritos)
+    let participantsForRound = roundNumber === 1
+      ? distributeFavorites(currentRoundParticipants, topFavorites, shuffledRest, bracketSize)
+      : [...currentRoundParticipants].sort(() => Math.random() - 0.5);
+
+    // Crear matches de esta ronda
+    for (let i = 0; i < participantsForRound.length; i += bracketSize) {
+      const matchParticipants = participantsForRound.slice(i, i + bracketSize);
       
-      for (let j = 0; j < bracketSize; j++) {
-        if (participantIndex < participants.length) {
-          // Si es el primer o último bracket, poner favoritos
-          if ((i === 0 || i === totalBrackets - 1) && favoriteIndex < topFavorites.length) {
-            bracket.push(topFavorites[favoriteIndex].userId);
-            favoriteIndex++;
-          } else {
-            // Usar participantes del resto mezclado
-            const restIndex = participantIndex - favoriteIndex;
-            if (restIndex < shuffledRest.length) {
-              bracket.push(shuffledRest[restIndex].userId);
-            } else if (favoriteIndex < topFavorites.length) {
-              bracket.push(topFavorites[favoriteIndex].userId);
-              favoriteIndex++;
-            }
-          }
-          participantIndex++;
-        }
-      }
-      
-      if (bracket.length > 0) {
-        brackets.push({
-          participants: bracket,
+      if (matchParticipants.length > 0) {
+        const matchId = `match-${roundNumber}-${matches.length + 1}`;
+        matches.push({
+          id: matchId,
+          participants: matchParticipants.map(p => p.userId || p.teamId || p.id),
           winnerId: null,
           status: 'pending'
         });
       }
     }
 
-    // Crear el bracket en Firestore
-    const bracketData = {
-      eventId,
-      round: 1,
-      matches: brackets,
-      isFinal: totalBrackets === 1
-    };
-
-    return await createBracket(bracketData);
-  } catch (error) {
-    throw error;
+    rounds.push(matches);
+    
+    // Para la siguiente ronda, cada match tendrá un ganador (por ahora null)
+    // En la práctica, el admin establecerá los ganadores y se generará la siguiente ronda
+    if (matches.length <= 1) break; // Si solo queda un match, es la final
+    
+    // Simular que avanzan todos (en realidad el admin establecerá ganadores)
+    currentRoundParticipants = matches.map(() => ({ id: 'pending' }));
+    roundNumber++;
   }
+
+  return rounds;
 };
 
-// Generar preview de brackets basado en participantes (sin guardar en Firestore)
-export const generatePreviewBrackets = (participants, participantsPerBracket = 2) => {
-  if (!participants || participants.length === 0) {
-    return [];
-  }
-
-  const bracketSize = participantsPerBracket || 2;
+// Distribuir favoritos en extremos opuestos (solo primera ronda)
+const distributeFavorites = (participants, topFavorites, shuffledRest, bracketSize) => {
+  const result = [];
   const totalBrackets = Math.ceil(participants.length / bracketSize);
-  const brackets = [];
-
-  // Mezclar participantes aleatoriamente
-  const shuffledParticipants = [...participants].sort(() => Math.random() - 0.5);
-
-  // Crear estructura de brackets
+  
+  let favoriteIndex = 0;
+  let restIndex = 0;
   let participantIndex = 0;
 
   for (let i = 0; i < totalBrackets; i++) {
     const bracket = [];
     
-    for (let j = 0; j < bracketSize && participantIndex < shuffledParticipants.length; j++) {
-      bracket.push(shuffledParticipants[participantIndex].userId);
+    for (let j = 0; j < bracketSize && participantIndex < participants.length; j++) {
+      // Si es el primer o último bracket, poner favoritos
+      if ((i === 0 || i === totalBrackets - 1) && favoriteIndex < topFavorites.length) {
+        bracket.push(topFavorites[favoriteIndex]);
+        favoriteIndex++;
+      } else {
+        // Usar participantes del resto mezclado
+        if (restIndex < shuffledRest.length) {
+          bracket.push(shuffledRest[restIndex]);
+          restIndex++;
+        } else if (favoriteIndex < topFavorites.length) {
+          bracket.push(topFavorites[favoriteIndex]);
+          favoriteIndex++;
+        }
+      }
       participantIndex++;
     }
     
-    if (bracket.length > 0) {
-      brackets.push({
-        participants: bracket,
-        winnerId: null,
-        status: 'pending'
-      });
-    }
+    result.push(...bracket);
   }
 
-  // Retornar estructura de bracket con round
-  return [{
+  return result;
+};
+
+// Generar brackets para carreras con grupos
+const generateRaceBrackets = (participants, maxPerGroup) => {
+  const rounds = [];
+  const totalParticipants = participants.length;
+  
+  // Primera ronda: dividir en grupos
+  const groups = [];
+  const shuffled = [...participants].sort(() => Math.random() - 0.5);
+  
+  for (let i = 0; i < shuffled.length; i += maxPerGroup) {
+    const group = shuffled.slice(i, i + maxPerGroup);
+    groups.push(group);
+  }
+
+  // Crear matches para cada grupo (cada grupo es un "match" con múltiples participantes)
+  const firstRoundMatches = groups.map((group, index) => ({
+    id: `group-${index + 1}`,
+    participants: group.map(p => p.userId || p.teamId || p.id),
+    winnerId: null,
+    status: 'pending',
+    isGroup: true // Indica que es un grupo, no un match 1v1
+  }));
+
+  rounds.push(firstRoundMatches);
+
+  // Segunda ronda: final con los ganadores de cada grupo
+  if (groups.length > 1) {
+    const finalMatch = {
+      id: 'final',
+      participants: groups.map((_, index) => `winner-group-${index + 1}`), // Placeholder para ganadores
+      winnerId: null,
+      status: 'pending',
+      isFinal: true
+    };
+    rounds.push([finalMatch]);
+  }
+
+  return rounds;
+};
+
+// Generar preview de brackets basado en participantes (sin guardar en Firestore)
+export const generatePreviewBrackets = (participants, bracketType = '1v1', participantsPerBracket = 2) => {
+  if (!participants || participants.length === 0) {
+    return [];
+  }
+
+  const bracketSize = participantsPerBracket || 2;
+  
+  // Lógica especial para carreras con grupos
+  if (bracketType === '10x10' || bracketType === 'custom') {
+    return generateRaceBracketsPreview(participants, bracketSize);
+  }
+
+  // Para 1v1 y 2v2: generar múltiples rondas
+  const rounds = [];
+  let currentRoundParticipants = [...participants];
+  let roundNumber = 1;
+
+  while (currentRoundParticipants.length > 1) {
+    const matches = [];
+    const shuffled = [...currentRoundParticipants].sort(() => Math.random() - 0.5);
+
+    for (let i = 0; i < shuffled.length; i += bracketSize) {
+      const matchParticipants = shuffled.slice(i, i + bracketSize);
+      
+      if (matchParticipants.length > 0) {
+        matches.push({
+          id: `preview-match-${roundNumber}-${matches.length + 1}`,
+          participants: matchParticipants.map(p => p.userId || p.teamId || p.id),
+          winnerId: null,
+          status: 'pending'
+        });
+      }
+    }
+
+    rounds.push({
+      round: roundNumber,
+      matches,
+      isFinal: matches.length === 1
+    });
+
+    // Para la siguiente ronda, simular que avanzan los ganadores
+    if (matches.length <= 1) break;
+    currentRoundParticipants = matches.map(() => ({ id: 'pending' }));
+    roundNumber++;
+  }
+
+  return rounds;
+};
+
+// Generar preview de brackets para carreras con grupos
+const generateRaceBracketsPreview = (participants, maxPerGroup) => {
+  const rounds = [];
+  const shuffled = [...participants].sort(() => Math.random() - 0.5);
+  
+  // Primera ronda: grupos
+  const groups = [];
+  for (let i = 0; i < shuffled.length; i += maxPerGroup) {
+    const group = shuffled.slice(i, i + maxPerGroup);
+    groups.push(group);
+  }
+
+  const firstRoundMatches = groups.map((group, index) => ({
+    id: `preview-group-${index + 1}`,
+    participants: group.map(p => p.userId || p.teamId || p.id),
+    winnerId: null,
+    status: 'pending',
+    isGroup: true
+  }));
+
+  rounds.push({
     round: 1,
-    matches: brackets,
-    isFinal: totalBrackets === 1
-  }];
+    matches: firstRoundMatches,
+    isFinal: false
+  });
+
+  // Segunda ronda: final
+  if (groups.length > 1) {
+    rounds.push({
+      round: 2,
+      matches: [{
+        id: 'preview-final',
+        participants: groups.map((_, index) => `winner-group-${index + 1}`),
+        winnerId: null,
+        status: 'pending',
+        isFinal: true
+      }],
+      isFinal: true
+    });
+  }
+
+  return rounds;
 };
 
 // Actualizar ganador de un match

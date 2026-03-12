@@ -80,26 +80,53 @@
 
 .bracket-round {
   margin-bottom: 40px;
+  position: relative;
 }
 
 .bracket-round h3 {
-  color: #667eea;
+  color: white;
   margin-bottom: 20px;
   font-size: 1.5rem;
+  text-align: center;
+  padding: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
 }
 
 .matches-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  align-items: center;
+  position: relative;
 }
 
 .match-card {
   background: white;
+  border: 2px solid #e0e0e0;
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+  width: 100%;
+  max-width: 300px;
+}
+
+.match-card.group-match {
+  border-color: #ff9800;
+  background: #fff8e1;
+}
+
+.match-card.final-match {
+  border-color: #ffd700;
+  background: #fffde7;
+  border-width: 3px;
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.3);
+}
+
+.participant.placeholder {
+  opacity: 0.6;
+  font-style: italic;
 }
 
 .match-card:hover {

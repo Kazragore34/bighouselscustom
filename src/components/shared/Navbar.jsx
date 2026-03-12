@@ -27,6 +27,7 @@ const Navbar = () => {
             <>
               <button onClick={() => navigate('/dashboard')}>Inicio</button>
               <button onClick={() => navigate('/events')}>Eventos</button>
+              <button onClick={() => navigate('/teams')}>Equipos</button>
               <button onClick={() => navigate('/winners')}>Ganadores</button>
               <button onClick={() => navigate('/profile')}>Perfil</button>
               <button onClick={() => navigate('/admin/users')}>Admin: Usuarios</button>
@@ -37,6 +38,7 @@ const Navbar = () => {
             <>
               <button onClick={() => navigate('/dashboard')}>Inicio</button>
               <button onClick={() => navigate('/events')}>Eventos</button>
+              <button onClick={() => navigate('/teams')}>Equipos</button>
               <button onClick={() => navigate('/winners')}>Ganadores</button>
               <button onClick={() => navigate('/profile')}>Perfil</button>
             </>

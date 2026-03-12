@@ -108,6 +108,25 @@
   transform: translateY(-2px);
 }
 
+.btn-winner {
+  background: #ff9800;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.btn-winner:hover {
+  background: #f57c00;
+  transform: translateY(-2px);
+}
+
 .participants-management {
   padding: 20px 0;
 }

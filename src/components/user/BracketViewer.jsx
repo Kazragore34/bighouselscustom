@@ -40,8 +40,14 @@ const BracketViewer = () => {
         console.log('Participantes del evento:', eventParticipants);
         
         if (eventParticipants.length > 0) {
+          // Obtener datos del evento para saber el tipo de bracket
+          const { getEventById } = await import('../../services/events');
+          const event = await getEventById(eventId);
+          const bracketType = event.bracketType || '1v1';
+          const participantsPerBracket = event.participantsPerBracket || 2;
+          
           // Generar preview de brackets
-          bracketsData = generatePreviewBrackets(eventParticipants, 2); // 2 participantes por bracket (1v1)
+          bracketsData = generatePreviewBrackets(eventParticipants, bracketType, participantsPerBracket);
           setIsPreview(true);
         }
       }
@@ -143,12 +149,20 @@ const BracketViewer = () => {
       
       {brackets.map((bracket, bracketIndex) => (
         <div key={bracketIndex} className="bracket-round">
-          <h3>Ronda {bracket.round}</h3>
+          <h3>
+            {bracket.isFinal ? '🏆 Final' : `Ronda ${bracket.round}`}
+          </h3>
           <div className="matches-container">
             {bracket.matches.map((match, matchIndex) => (
-              <div key={matchIndex} className="match-card">
+              <div key={matchIndex} className={`match-card ${match.isGroup ? 'group-match' : ''} ${match.isFinal ? 'final-match' : ''}`}>
                 <div className="match-header">
-                  <span>Match {matchIndex + 1}</span>
+                  {match.isGroup ? (
+                    <span>Grupo {matchIndex + 1}</span>
+                  ) : match.isFinal ? (
+                    <span>🏆 Final</span>
+                  ) : (
+                    <span>Match {matchIndex + 1}</span>
+                  )}
                   {match.winnerId && (
                     <span className="winner-badge">
                       <Trophy size={14} />
@@ -157,19 +171,32 @@ const BracketViewer = () => {
                   )}
                 </div>
                 <div className="match-participants">
-                  {match.participants.map((participantId, pIndex) => (
-                    <div
-                      key={participantId}
-                      className={`participant ${match.winnerId === participantId ? 'winner' : ''}`}
-                    >
-                      <div className="participant-name">
-                        {getParticipantName(participantId)}
+                  {match.participants.map((participantId, pIndex) => {
+                    // Manejar placeholders para ganadores de grupos
+                    if (participantId.startsWith('winner-group-')) {
+                      return (
+                        <div key={participantId} className="participant placeholder">
+                          <div className="participant-name">
+                            Ganador {participantId.replace('winner-group-', 'Grupo ')}
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div
+                        key={participantId}
+                        className={`participant ${match.winnerId === participantId ? 'winner' : ''}`}
+                      >
+                        <div className="participant-name">
+                          {getParticipantName(participantId)}
+                        </div>
+                        {match.winnerId === participantId && (
+                          <Trophy size={16} className="trophy-icon" />
+                        )}
                       </div>
-                      {match.winnerId === participantId && (
-                        <Trophy size={16} className="trophy-icon" />
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className={`match-status ${match.status}`}>
                   {match.status === 'completed' ? 'Completado' : 'Pendiente'}

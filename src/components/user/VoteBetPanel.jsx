@@ -8,6 +8,7 @@ import { createBet } from '../../services/bets';
 import { calculateOdds } from '../../utils/prizeCalculator';
 import { useAuth } from '../../context/AuthContext';
 import PaymentModal from '../shared/PaymentModal';
+import BetsModal from './BetsModal';
 import { Heart, DollarSign, Trophy, TrendingUp, GitBranch } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -27,6 +28,7 @@ const VoteBetPanel = () => {
   const [userBets, setUserBets] = useState({}); // Objeto con participantId -> array de apuestas
   const [eventData, setEventData] = useState(null); // Datos del evento para validar fecha límite
   const [previewBrackets, setPreviewBrackets] = useState([]); // Preview de brackets basado en participantes actuales
+  const [showBetsModal, setShowBetsModal] = useState(false); // Modal de apuestas
 
   useEffect(() => {
     if (user && user.id && eventId) {
@@ -69,8 +71,10 @@ const VoteBetPanel = () => {
       setParticipants(participantsWithData);
 
       // Generar preview de brackets basado en participantes actuales
-      if (participantsWithData.length > 0) {
-        const preview = generatePreviewBrackets(participantsWithData, 2);
+      if (participantsWithData.length > 0 && event) {
+        const bracketType = event.bracketType || '1v1';
+        const participantsPerBracket = event.participantsPerBracket || 2;
+        const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
         setPreviewBrackets(preview);
       }
 
@@ -219,17 +223,27 @@ const VoteBetPanel = () => {
     <div className="vote-bet-panel">
       <div className="panel-header">
         <h2>Participantes</h2>
-        <button
-          onClick={() => {
-            console.log('Navegando a brackets para evento:', eventId);
-            navigate(`/events/${eventId}/brackets`);
-          }}
-          className="btn-view-brackets"
-          title="Ver brackets del evento"
-        >
-          <GitBranch size={18} />
-          Ver Brackets
-        </button>
+        <div className="header-actions">
+          <button
+            onClick={() => setShowBetsModal(true)}
+            className="btn-view-bets"
+            title="Ver mis apuestas"
+          >
+            <DollarSign size={18} />
+            Mis Apuestas
+          </button>
+          <button
+            onClick={() => {
+              console.log('Navegando a brackets para evento:', eventId);
+              navigate(`/events/${eventId}/brackets`);
+            }}
+            className="btn-view-brackets"
+            title="Ver brackets del evento"
+          >
+            <GitBranch size={18} />
+            Ver Brackets
+          </button>
+        </div>
       </div>
       
       {/* Mostrar fecha límite si existe */}
@@ -344,27 +358,21 @@ const VoteBetPanel = () => {
                       </div>
                     )}
                     
-                    {/* Mostrar apuestas existentes del usuario */}
+                    {/* Mostrar resumen de apuestas existentes */}
                     {userBets[participant.userId] && userBets[participant.userId].length > 0 && (
-                      <div className="existing-bets-info">
-                        <p className="existing-bets-title">Tus apuestas:</p>
-                        {userBets[participant.userId].map((bet) => (
-                          <div key={bet.id} className="existing-bet-item">
-                            <span>${bet.amount.toFixed(2)}</span>
-                            <span className="bet-status">{bet.status === 'confirmed' ? '✓ Confirmada' : '⏳ Pendiente'}</span>
-                            {bet.status === 'confirmed' && (
-                              <span className="potential-winnings">
-                                Ganarías: ${(bet.amount * odds.payoutMultiplier).toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                        <div className="total-bet-info">
-                          <strong>Total apostado: ${userBets[participant.userId]
+                      <div className="existing-bets-summary">
+                        <p className="existing-bets-title">
+                          {userBets[participant.userId].length} apuesta(s) - Total: ${userBets[participant.userId]
                             .filter(b => b.status === 'confirmed')
                             .reduce((sum, b) => sum + b.amount, 0)
-                            .toFixed(2)}</strong>
-                        </div>
+                            .toFixed(2)}
+                        </p>
+                        <button
+                          onClick={() => setShowBetsModal(true)}
+                          className="btn-view-details"
+                        >
+                          Ver Detalles
+                        </button>
                       </div>
                     )}
                   </>
@@ -436,6 +444,12 @@ const VoteBetPanel = () => {
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
+      />
+
+      <BetsModal
+        eventId={eventId}
+        isOpen={showBetsModal}
+        onClose={() => setShowBetsModal(false)}
       />
     </div>
   );

@@ -9,6 +9,7 @@ import VoteBetPanel from './components/user/VoteBetPanel';
 import BracketViewer from './components/user/BracketViewer';
 import Winners from './components/user/Winners';
 import Profile from './components/user/Profile';
+import TeamManagement from './components/user/TeamManagement';
 import UserManagement from './components/admin/UserManagement';
 import EventManagement from './components/admin/EventManagement';
 import BetConfirmation from './components/admin/BetConfirmation';
@@ -112,6 +113,16 @@ function App() {
             <ProtectedRoute>
               <Navbar />
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/teams"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <TeamManagement />
             </ProtectedRoute>
           }
         />

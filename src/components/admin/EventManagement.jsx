@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { getAllEvents, createEvent, updateEvent, deleteEvent, getEventParticipants, addParticipantsToEvent } from '../../services/events';
 import { getAllUsers, getUserById } from '../../services/users';
 import { fileToBase64 } from '../../utils/imageUtils';
-import { Plus, Edit, Trash2, Upload, Users, UserPlus, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Users, UserPlus, X, Trophy } from 'lucide-react';
+import ParticipantsModal from './ParticipantsModal';
 import './EventManagement.css';
 
 const EventManagement = () => {
@@ -146,6 +147,79 @@ const EventManagement = () => {
     setShowModal(true);
   };
 
+  const handleSetWinner = async (event) => {
+    try {
+      const eventData = await getEventById(event.id);
+      const participants = await getEventParticipants(event.id);
+      const participantsWithData = await Promise.all(
+        participants.map(async (p) => {
+          try {
+            const userData = await getUserById(p.userId);
+            return { ...p, ...userData };
+          } catch (err) {
+            return { ...p, username: 'Usuario no encontrado' };
+          }
+        })
+      );
+
+      const isTeamEvent = event.bracketType === '2v2' || event.bracketType === 'custom';
+      
+      if (isTeamEvent) {
+        // Para eventos por equipos, mostrar equipos
+        const teams = {};
+        participantsWithData.forEach(p => {
+          if (p.teamId) {
+            if (!teams[p.teamId]) {
+              teams[p.teamId] = [];
+            }
+            teams[p.teamId].push(p);
+          }
+        });
+
+        const teamOptions = Object.entries(teams).map(([teamId, members]) => ({
+          id: teamId,
+          name: `Equipo ${teamId}`,
+          members: members.map(m => m.username).join(', ')
+        }));
+
+        const selectedTeam = prompt(
+          `Equipos disponibles:\n${teamOptions.map((t, i) => `${i + 1}. ${t.name} (${t.members})`).join('\n')}\n\nIngresa el número del equipo ganador:`
+        );
+
+        if (selectedTeam) {
+          const teamIndex = parseInt(selectedTeam) - 1;
+          if (teamIndex >= 0 && teamIndex < teamOptions.length) {
+            await setEventWinner(event.id, null, teamOptions[teamIndex].id);
+            alert('Ganador establecido exitosamente');
+            loadData();
+          }
+        }
+      } else {
+        // Para eventos individuales
+        const participantOptions = participantsWithData.map((p, i) => ({
+          id: p.userId,
+          name: p.username || 'Usuario desconocido',
+          index: i + 1
+        }));
+
+        const selected = prompt(
+          `Participantes disponibles:\n${participantOptions.map(p => `${p.index}. ${p.name}`).join('\n')}\n\nIngresa el número del ganador:`
+        );
+
+        if (selected) {
+          const participantIndex = parseInt(selected) - 1;
+          if (participantIndex >= 0 && participantIndex < participantOptions.length) {
+            await setEventWinner(event.id, participantOptions[participantIndex].id, null);
+            alert('Ganador establecido exitosamente');
+            loadData();
+          }
+        }
+      }
+    } catch (error) {
+      alert('Error al establecer ganador: ' + error.message);
+    }
+  };
+
   const handleUpdateEvent = async () => {
     try {
       // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined ni null)
@@ -272,6 +346,20 @@ const EventManagement = () => {
                   <Users size={16} />
                   Participantes
                 </button>
+                {(event.status === 'active' || event.status === 'completed') && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      await handleSetWinner(event);
+                    }}
+                    className="btn-winner"
+                    title="Establecer ganador"
+                  >
+                    <Trophy size={16} />
+                    Ganador
+                  </button>
+                )}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -523,93 +611,18 @@ const EventManagement = () => {
       )}
 
       {/* Modal para gestionar participantes */}
-      {showParticipantsModal && currentEventForParticipants && (
-        <div className="modal-overlay" onClick={() => { setShowParticipantsModal(false); setCurrentEventForParticipants(null); setSelectedParticipants([]); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Gestionar Participantes - {currentEventForParticipants.name}</h2>
-            
-            <div className="participants-management">
-              <div className="current-participants-section">
-                <h3>Participantes Actuales ({eventParticipants.length})</h3>
-                {eventParticipants.length === 0 ? (
-                  <p className="no-participants">No hay participantes agregados aún</p>
-                ) : (
-                  <div className="participants-list">
-                    {eventParticipants.map(p => (
-                      <div key={p.id} className="participant-badge">
-                        <span>{p.username || p.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Agregar Participantes</label>
-                <div className="participants-selector">
-                  {users.filter(u => !eventParticipants.find(p => p.userId === u.id)).map(user => (
-                    <label key={user.id} className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={selectedParticipants.includes(user.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedParticipants([...selectedParticipants, user.id]);
-                          } else {
-                            setSelectedParticipants(selectedParticipants.filter(id => id !== user.id));
-                          }
-                        }}
-                      />
-                      {user.username}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="modal-actions">
-                <button
-                  onClick={async () => {
-                    if (selectedParticipants.length > 0) {
-                      try {
-                        await addParticipantsToEvent(currentEventForParticipants.id, selectedParticipants);
-                        alert('Participantes agregados exitosamente');
-                        // Recargar participantes
-                        const participants = await getEventParticipants(currentEventForParticipants.id);
-                        const participantsWithData = await Promise.all(
-                          participants.map(async (p) => {
-                            const userData = await getUserById(p.userId);
-                            return { ...p, ...userData };
-                          })
-                        );
-                        setEventParticipants(participantsWithData);
-                        setSelectedParticipants([]);
-                        loadData(); // Recargar lista de eventos
-                      } catch (error) {
-                        alert('Error al agregar participantes: ' + error.message);
-                      }
-                    }
-                  }}
-                  className="btn-save"
-                  disabled={selectedParticipants.length === 0}
-                >
-                  <UserPlus size={16} />
-                  Agregar {selectedParticipants.length > 0 ? `(${selectedParticipants.length})` : ''}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowParticipantsModal(false);
-                    setCurrentEventForParticipants(null);
-                    setSelectedParticipants([]);
-                  }}
-                  className="btn-cancel"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ParticipantsModal
+        event={currentEventForParticipants}
+        isOpen={showParticipantsModal}
+        onClose={() => {
+          setShowParticipantsModal(false);
+          setCurrentEventForParticipants(null);
+          setSelectedParticipants([]);
+        }}
+        onUpdate={() => {
+          loadData();
+        }}
+      />
     </div>
   );
 };
