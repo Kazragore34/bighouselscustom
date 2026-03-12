@@ -80,10 +80,9 @@ const EventManagement = () => {
         }
       }
 
-      const eventId = await createEvent({
-        ...formData,
-        bannerFile: undefined
-      });
+      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined)
+      const { bannerFile, ...eventData } = formData;
+      const eventId = await createEvent(eventData);
 
       // Agregar participantes si se seleccionaron
       if (selectedParticipants.length > 0) {
@@ -118,10 +117,9 @@ const EventManagement = () => {
 
   const handleUpdateEvent = async () => {
     try {
-      await updateEvent(editingEvent.id, {
-        ...formData,
-        bannerFile: undefined
-      });
+      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined)
+      const { bannerFile, ...eventData } = formData;
+      await updateEvent(editingEvent.id, eventData);
 
       alert('Evento actualizado exitosamente');
       setShowModal(false);

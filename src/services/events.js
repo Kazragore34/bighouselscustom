@@ -19,13 +19,18 @@ export const createEvent = async (eventData) => {
     const eventsRef = collection(db, 'events');
     const newEventRef = doc(eventsRef);
     
-    await setDoc(newEventRef, {
-      ...eventData,
-      status: eventData.status || 'draft',
-      createdAt: serverTimestamp(),
-      startDate: eventData.startDate || null,
-      endDate: eventData.endDate || null
-    });
+    // Limpiar campos undefined antes de enviar a Firestore
+    const cleanData = Object.fromEntries(
+      Object.entries({
+        ...eventData,
+        status: eventData.status || 'draft',
+        createdAt: serverTimestamp(),
+        startDate: eventData.startDate || null,
+        endDate: eventData.endDate || null
+      }).filter(([_, value]) => value !== undefined)
+    );
+    
+    await setDoc(newEventRef, cleanData);
 
     return newEventRef.id;
   } catch (error) {
@@ -92,7 +97,13 @@ export const getEventById = async (eventId) => {
 export const updateEvent = async (eventId, updates) => {
   try {
     const eventRef = doc(db, 'events', eventId);
-    await updateDoc(eventRef, updates);
+    
+    // Limpiar campos undefined antes de enviar a Firestore
+    const cleanUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+    
+    await updateDoc(eventRef, cleanUpdates);
     return true;
   } catch (error) {
     throw error;
