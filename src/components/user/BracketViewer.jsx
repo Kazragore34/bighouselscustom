@@ -33,7 +33,9 @@ const BracketViewer = () => {
       // Primero intentar cargar brackets oficiales
       let bracketsData = [];
       try {
-        bracketsData = await getBracketsByEvent(eventId);
+        const allBrackets = await getBracketsByEvent(eventId);
+        // Filtrar solo brackets del evento actual para asegurar que no haya mezcla
+        bracketsData = allBrackets.filter(b => b.eventId === eventId);
         console.log('Brackets oficiales encontrados:', bracketsData);
         setIsPreview(false);
       } catch (error) {
@@ -53,7 +55,7 @@ const BracketViewer = () => {
           const bracketType = event.bracketType || '1v1';
           const participantsPerBracket = event.participantsPerBracket || 2;
           
-          // Generar preview de brackets
+          // Generar preview de brackets SOLO con participantes de este evento
           bracketsData = generatePreviewBrackets(eventParticipants, bracketType, participantsPerBracket);
           setIsPreview(true);
         }
@@ -191,9 +193,13 @@ const BracketViewer = () => {
                   {match.participants.map((participantId, pIndex) => {
                     // Manejar placeholders para ganadores de grupos
                     if (participantId.startsWith('winner-group-')) {
-                      // Buscar el ganador real del grupo anterior
+                      // Buscar el ganador real del grupo anterior SOLO en brackets del mismo evento
                       const groupNumber = participantId.replace('winner-group-', '');
-                      const previousRound = brackets[bracketIndex - 1];
+                      const previousRound = brackets.find((b, idx) => 
+                        idx < bracketIndex && 
+                        b.round === bracket.round - 1 &&
+                        b.eventId === bracket.eventId
+                      );
                       let actualWinner = null;
                       
                       if (previousRound && previousRound.matches) {
@@ -217,6 +223,11 @@ const BracketViewer = () => {
                           </div>
                         </div>
                       );
+                    }
+                    
+                    // Filtrar "pending" y valores inválidos - no mostrar participantes pendientes
+                    if (!participantId || participantId === 'pending' || participantId === null || participantId === undefined) {
+                      return null;
                     }
                     
                     const isWinner = match.winnerId === participantId;

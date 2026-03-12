@@ -314,7 +314,8 @@ export const generatePreviewBrackets = (participants, bracketType = '1v1', parti
 
     // Para la siguiente ronda, simular que avanzan los ganadores
     if (matches.length <= 1) break;
-    currentRoundParticipants = matches.map(() => ({ id: 'pending' }));
+    // No crear participantes "pending", solo avanzar si hay ganadores reales
+    currentRoundParticipants = [];
     roundNumber++;
   }
 
