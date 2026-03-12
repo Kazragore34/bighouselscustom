@@ -8,6 +8,7 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    emptyOutDir: true, // Limpiar carpeta dist antes de build
     rollupOptions: {
       output: {
         manualChunks: {

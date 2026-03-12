@@ -1,0 +1,45 @@
+name: Build and Deploy Simple
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build project
+      run: npm run build
+    
+    - name: Prepare files for deployment
+      run: |
+        # Crear carpeta deploy con solo los archivos necesarios
+        mkdir -p deploy
+        cp -r dist/* deploy/
+        cp dist/.htaccess deploy/ 2>/dev/null || true
+        
+        # También copiar .env si existe (aunque debería estar en secrets)
+        cp .env deploy/ 2>/dev/null || true
+        
+        echo "Files ready in deploy folder"
+        ls -la deploy/
+    
+    - name: Upload deployment files
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-files
+        path: deploy/
+        retention-days: 1

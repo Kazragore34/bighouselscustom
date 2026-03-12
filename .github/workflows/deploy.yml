@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Build and Deploy to Public
 
 on:
   push:
@@ -6,26 +6,48 @@ on:
       - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
+        cache: 'npm'
     
     - name: Install dependencies
-      run: npm install
+      run: npm ci
     
-    - name: Build
+    - name: Build project
       run: npm run build
+      env:
+        VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+        VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+        VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
     
-    - name: Deploy
-      # Aquí agregarías los comandos para subir la carpeta dist a tu servidor
-      # Por ejemplo, usando FTP, SSH, o el servicio que uses
+    - name: Copy dist files to root
       run: |
-        echo "Build completado. Archivos en carpeta dist/"
-        ls -la dist/
+        # Copiar archivos de dist a la raíz
+        cp -r dist/* .
+        cp dist/.htaccess . 2>/dev/null || true
+        
+        # Listar lo que se copió
+        ls -la
+    
+    - name: Commit and push
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .
+        git diff --staged --quiet || git commit -m "Auto-build: Deploy compiled files to public_html [skip ci]"
+        git push origin main
