@@ -32,15 +32,45 @@ export const calculateOdds = async (eventId, participantId) => {
     const participantVotes = votes.filter(vote => vote.favoriteId === participantId).length;
     const totalVotes = votes.length;
 
-    // Fórmula de odds: 
-    // - Menos votos pero más apuestas = odds más altas
-    // - Más votos pero menos apuestas = odds más bajas
+    // Calcular ratio de votos (peso principal: 75%)
     const voteRatio = totalVotes > 0 ? participantVotes / totalVotes : 0.5;
+
+    // Calcular ratio de dinero apostado (peso secundario: 25%)
     const betRatio = participantBetAmount / totalBetAmount;
 
-    // Calcular odds inversas (menos popular = más paga)
-    // Si tiene pocos votos pero muchas apuestas, paga más
-    const popularityScore = voteRatio * 0.6 + betRatio * 0.4;
+    // MEDIDAS ANTI-MANIPULACIÓN:
+    
+    // 1. Normalizar el impacto del dinero usando logaritmo
+    // Esto reduce el impacto de grandes apuestas individuales
+    const normalizedBetRatio = betRatio > 0 
+      ? Math.log10(betRatio * 9 + 1) / Math.log10(10) // Normalizar entre 0 y 1
+      : 0;
+
+    // 2. Considerar cantidad de apostadores únicos (más apostadores = más legítimo)
+    const uniqueBettors = new Set(
+      confirmedBets
+        .filter(bet => bet.participantId === participantId)
+        .map(bet => bet.userId)
+    ).size;
+    const totalUniqueBettors = new Set(confirmedBets.map(bet => bet.userId)).size;
+    const bettorDiversity = totalUniqueBettors > 0 ? uniqueBettors / totalUniqueBettors : 0;
+
+    // 3. Factor de concentración (si mucho dinero viene de pocos apostadores, es sospechoso)
+    const participantBets = confirmedBets.filter(bet => bet.participantId === participantId);
+    const avgBetPerBettor = uniqueBettors > 0 ? participantBetAmount / uniqueBettors : 0;
+    const totalAvgBetPerBettor = totalUniqueBettors > 0 ? totalBetAmount / totalUniqueBettors : 0;
+    
+    // Si la apuesta promedio por apostador es mucho mayor que el promedio general, reducir su impacto
+    const concentrationFactor = totalAvgBetPerBettor > 0 
+      ? Math.min(1, totalAvgBetPerBettor / Math.max(avgBetPerBettor, totalAvgBetPerBettor))
+      : 1;
+
+    // 4. Ajustar el betRatio con factores anti-manipulación
+    const adjustedBetRatio = normalizedBetRatio * bettorDiversity * concentrationFactor;
+
+    // Fórmula mejorada: VOTOS tienen 75% de peso, DINERO solo 25% (y normalizado)
+    // Esto protege contra manipulación donde pocos apostadores grandes distorsionan las odds
+    const popularityScore = voteRatio * 0.75 + adjustedBetRatio * 0.25;
     const inversePopularity = 1 - popularityScore;
 
     // Odds base (ajustable)
@@ -57,7 +87,9 @@ export const calculateOdds = async (eventId, participantId) => {
       totalBetAmount,
       participantBetAmount,
       participantVotes,
-      totalVotes
+      totalVotes,
+      uniqueBettors, // Para debugging/transparencia
+      bettorDiversity: parseFloat(bettorDiversity.toFixed(2))
     };
   } catch (error) {
     throw error;

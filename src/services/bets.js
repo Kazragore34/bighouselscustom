@@ -13,15 +13,28 @@ import {
 import { db } from './firebase';
 
 // Crear apuesta (permite múltiples apuestas al mismo participante)
-export const createBet = async (eventId, userId, participantId, amount) => {
+export const createBet = async (eventId, userId, participantId, amount, maxBetPerUser = 0) => {
   try {
+    const betAmount = parseFloat(amount);
+    
+    // Validar límite máximo por usuario si está configurado
+    if (maxBetPerUser > 0) {
+      const userBets = await getBetsByUser(userId);
+      const eventUserBets = userBets.filter(bet => bet.eventId === eventId && bet.status === 'confirmed');
+      const totalBetByUser = eventUserBets.reduce((sum, bet) => sum + bet.amount, 0);
+      
+      if (totalBetByUser + betAmount > maxBetPerUser) {
+        throw new Error(`Has alcanzado el límite máximo de apuesta para este evento ($${maxBetPerUser.toFixed(2)}). Ya has apostado $${totalBetByUser.toFixed(2)}`);
+      }
+    }
+
     // Crear la apuesta con estado pendiente (permitir múltiples apuestas)
     const newBetRef = doc(collection(db, 'bets'));
     await setDoc(newBetRef, {
       eventId,
       userId,
       participantId,
-      amount: parseFloat(amount),
+      amount: betAmount,
       status: 'pending',
       createdAt: serverTimestamp(),
       confirmedBy: null,

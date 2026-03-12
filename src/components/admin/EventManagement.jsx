@@ -24,7 +24,8 @@ const EventManagement = () => {
     bannerFile: null,
     betDeadline: '', // Fecha/hora límite para apostar/votar
     startDate: '',
-    endDate: ''
+    endDate: '',
+    maxBetPerUser: 0 // 0 = sin límite, >0 = límite máximo por usuario
   });
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -123,7 +124,8 @@ const EventManagement = () => {
       bannerFile: null,
       betDeadline: event.betDeadline || '',
       startDate: event.startDate || '',
-      endDate: event.endDate || ''
+      endDate: event.endDate || '',
+      maxBetPerUser: event.maxBetPerUser || 0
     });
     
     // Cargar participantes del evento
@@ -188,7 +190,8 @@ const EventManagement = () => {
       bannerFile: null,
       betDeadline: '',
       startDate: '',
-      endDate: ''
+      endDate: '',
+      maxBetPerUser: 0
     });
     setSelectedParticipants([]);
     setEditingEvent(null);

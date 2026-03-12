@@ -174,7 +174,8 @@ const VoteBetPanel = () => {
     }
 
     try {
-      await createBet(eventId, user.id, participantId, amount);
+      const maxBetPerUser = eventData?.maxBetPerUser || 0;
+      await createBet(eventId, user.id, participantId, amount, maxBetPerUser);
       setShowPaymentModal(true);
       // Limpiar solo el monto de este participante
       setBetAmounts({ ...betAmounts, [participantId]: '' });
