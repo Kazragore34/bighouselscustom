@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { login as loginService } from '../services/auth';
+import { login as loginService, loginWithGoogle } from '../services/auth';
 
 const AuthContext = createContext(null);
 
@@ -39,6 +39,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginGoogle = async () => {
+    try {
+      const userData = await loginWithGoogle();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
@@ -51,6 +62,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     login,
+    loginGoogle,
     logout,
     isAdmin: isAdmin(),
     loading

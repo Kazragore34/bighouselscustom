@@ -35,8 +35,9 @@ export const createUser = async (userData) => {
     const newUserRef = doc(collection(db, 'users'));
     await setDoc(newUserRef, {
       username,
+      name: userData.name || username, // Nombre de la persona
       password: hashedPassword,
-      userType: userType || 'VOTANTE_APOSTADOR',
+      userType: userType || 'SOLO_VISUALIZAR',
       email: email || '',
       photoURL: '',
       enabled,

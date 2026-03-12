@@ -10,7 +10,11 @@ import {
   deleteDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { 
+  signInWithPopup, 
+  signOut as firebaseSignOut 
+} from 'firebase/auth';
+import { db, auth, googleProvider } from './firebase';
 import { hashPassword, verifyPassword } from '../utils/passwordHash';
 
 // Login
@@ -53,9 +57,9 @@ export const login = async (username, password) => {
 // Crear usuario (ahora público, pero con permisos limitados por defecto)
 export const createUser = async (userData) => {
   try {
-    const { username, password, userType, email, enabled = true } = userData;
+    const { username, password, userType, email, name, enabled = true } = userData;
     
-    // Verificar si el usuario ya existe
+    // Verificar si el usuario ya existe (solo lectura del campo username)
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('username', '==', username));
     const querySnapshot = await getDocs(q);
@@ -71,8 +75,9 @@ export const createUser = async (userData) => {
     const newUserRef = doc(collection(db, 'users'));
     await setDoc(newUserRef, {
       username,
+      name: name || username, // Nombre de la persona (puede ser diferente al username)
       password: hashedPassword,
-      userType: userType || 'VOTANTE_APOSTADOR',
+      userType: userType || 'SOLO_VISUALIZAR',
       email: email || '',
       photoURL: '',
       enabled,
@@ -103,6 +108,71 @@ export const getUserById = async (userId) => {
       ...userWithoutPassword
     };
   } catch (error) {
+    throw error;
+  }
+};
+
+// Login con Google
+export const loginWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const googleUser = result.user;
+    
+    // Verificar si el usuario ya existe en Firestore
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', googleUser.email));
+    const querySnapshot = await getDocs(q);
+
+    let userData;
+    
+    if (querySnapshot.empty) {
+      // Crear nuevo usuario desde Google
+      const newUserRef = doc(collection(db, 'users'));
+      const newUser = {
+        username: googleUser.email.split('@')[0] || `user_${Date.now()}`,
+        name: googleUser.displayName || googleUser.email.split('@')[0],
+        email: googleUser.email,
+        photoURL: googleUser.photoURL || '',
+        userType: 'SOLO_VISUALIZAR',
+        enabled: true,
+        badges: [],
+        createdAt: serverTimestamp(),
+        googleAuth: true // Marcar que viene de Google
+      };
+      
+      await setDoc(newUserRef, newUser);
+      userData = {
+        id: newUserRef.id,
+        ...newUser
+      };
+    } else {
+      // Usuario existente
+      const userDoc = querySnapshot.docs[0];
+      const existingUser = userDoc.data();
+      
+      // Actualizar foto si viene de Google y no tiene
+      if (googleUser.photoURL && !existingUser.photoURL) {
+        await updateDoc(userDoc.ref, { photoURL: googleUser.photoURL });
+      }
+      
+      userData = {
+        id: userDoc.id,
+        ...existingUser,
+        photoURL: googleUser.photoURL || existingUser.photoURL
+      };
+    }
+
+    // Verificar si está habilitado
+    if (!userData.enabled) {
+      await firebaseSignOut(auth);
+      throw new Error('Usuario deshabilitado. Contacte al administrador.');
+    }
+
+    return userData;
+  } catch (error) {
+    if (error.code === 'auth/popup-closed-by-user') {
+      throw new Error('Inicio de sesión cancelado');
+    }
     throw error;
   }
 };

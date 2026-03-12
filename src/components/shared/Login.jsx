@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { Chrome } from 'lucide-react';
 import './Login.css';
 
 const Login = () => {
@@ -8,7 +9,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -21,6 +22,20 @@ const Login = () => {
       navigate('/dashboard');
     } catch (err) {
       setError(err.message || 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      await loginGoogle();
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Error al iniciar sesión con Google');
     } finally {
       setLoading(false);
     }
@@ -63,6 +78,20 @@ const Login = () => {
 
           <button type="submit" disabled={loading} className="login-button">
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          </button>
+
+          <div className="divider">
+            <span>O</span>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={handleGoogleLogin} 
+            disabled={loading}
+            className="google-button"
+          >
+            <Chrome size={20} />
+            Continuar con Google
           </button>
 
           <div className="signup-link">

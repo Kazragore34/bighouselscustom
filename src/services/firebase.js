@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // Storage removido - usando base64 y URLs directas en su lugar
 // Analytics opcional - comentado para evitar errores si no está habilitado
 
@@ -18,6 +19,10 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore
 export const db = getFirestore(app);
+
+// Initialize Auth
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
 
 // Storage no se usa - el plan gratuito no lo incluye
 // Usamos base64 para imágenes pequeñas y URLs directas para imágenes grandes

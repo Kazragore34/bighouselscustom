@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { createUser } from '../../services/auth';
+import { createUser, loginWithGoogle } from '../../services/auth';
+import { Chrome } from 'lucide-react';
 import './SignUp.css';
 
 const SignUp = () => {
   const [formData, setFormData] = useState({
     username: '',
+    name: '',
     password: '',
     confirmPassword: '',
     email: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { loginGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -36,6 +39,7 @@ const SignUp = () => {
       // Crear usuario con tipo por defecto: SOLO_VISUALIZAR
       await createUser({
         username: formData.username,
+        name: formData.name || formData.username, // Nombre de la persona
         password: formData.password,
         userType: 'SOLO_VISUALIZAR',
         email: formData.email,
@@ -46,6 +50,20 @@ const SignUp = () => {
       navigate('/login');
     } catch (err) {
       setError(err.message || 'Error al crear la cuenta');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      await loginGoogle();
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Error al iniciar sesión con Google');
     } finally {
       setLoading(false);
     }
@@ -72,6 +90,17 @@ const SignUp = () => {
               required
               placeholder="Elige un nombre de usuario"
               minLength={3}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="name">Nombre Completo</label>
+            <input
+              id="name"
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Tu nombre completo (opcional)"
             />
           </div>
 
@@ -118,6 +147,20 @@ const SignUp = () => {
 
           <button type="submit" disabled={loading} className="signup-button">
             {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
+          </button>
+
+          <div className="divider">
+            <span>O</span>
+          </div>
+
+          <button 
+            type="button" 
+            onClick={handleGoogleSignUp} 
+            disabled={loading}
+            className="google-button"
+          >
+            <Chrome size={20} />
+            Continuar con Google
           </button>
 
           <div className="login-link">

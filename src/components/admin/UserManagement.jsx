@@ -13,6 +13,7 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
+    name: '',
     password: '',
     userType: 'SOLO_VISUALIZAR',
     email: '',
@@ -70,6 +71,7 @@ const UserManagement = () => {
 
       await createUser({
         username: formData.username,
+        name: formData.name || formData.username,
         password,
         userType: formData.userType,
         email: formData.email,
@@ -89,6 +91,7 @@ const UserManagement = () => {
     setEditingUser(user);
     setFormData({
       username: user.username,
+      name: user.name || '',
       password: '',
       userType: user.userType || 'SOLO_VISUALIZAR',
       email: user.email || '',
@@ -102,6 +105,7 @@ const UserManagement = () => {
     try {
       const updates = {
         userType: formData.userType,
+        name: formData.name || formData.username,
         email: formData.email,
         enabled: formData.enabled
       };
@@ -197,7 +201,14 @@ const UserManagement = () => {
           <tbody>
             {filteredUsers.map(user => (
               <tr key={user.id}>
-                <td>{user.username}</td>
+                <td>
+                  <div>
+                    <strong>{user.username}</strong>
+                    {user.name && user.name !== user.username && (
+                      <div style={{ fontSize: '0.85rem', color: '#666' }}>{user.name}</div>
+                    )}
+                  </div>
+                </td>
                 <td>{user.email || '-'}</td>
                 <td>
                   <span className={`badge badge-${user.userType.toLowerCase()}`}>
@@ -242,6 +253,17 @@ const UserManagement = () => {
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 disabled={!!editingUser}
                 required
+                placeholder="Nombre de usuario único"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Nombre Completo</label>
+              <input
+                type="text"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nombre de la persona (puede ser diferente al usuario)"
               />
             </div>
 
