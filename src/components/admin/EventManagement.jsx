@@ -407,6 +407,19 @@ const EventManagement = () => {
             </div>
 
             <div className="form-group">
+              <label>Límite Máximo de Apuesta por Usuario (Anti-Manipulación)</label>
+              <input
+                type="number"
+                value={formData.maxBetPerUser || ''}
+                onChange={(e) => setFormData({ ...formData, maxBetPerUser: parseFloat(e.target.value) || 0 })}
+                min="0"
+                step="0.01"
+                placeholder="0 = Sin límite"
+              />
+              <p className="help-text">💡 Establece un límite máximo que cada usuario puede apostar en total en este evento. 0 = sin límite. Esto ayuda a prevenir manipulación.</p>
+            </div>
+
+            <div className="form-group">
               <label>Banner del Evento (URL o subir imagen)</label>
               <div className="banner-input-group">
                 <input
