@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import './Login.css';
 
 const Login = () => {
@@ -64,6 +64,10 @@ const Login = () => {
           <button type="submit" disabled={loading} className="login-button">
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
+
+          <div className="signup-link">
+            <p>¿No tienes cuenta? <Link to="/signup">Regístrate aquí</Link></p>
+          </div>
         </form>
       </div>
     </div>

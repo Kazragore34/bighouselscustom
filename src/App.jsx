@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Login from './components/shared/Login';
+import SignUp from './components/shared/SignUp';
 import Navbar from './components/shared/Navbar';
 import Dashboard from './components/user/Dashboard';
 import EventSelector from './components/user/EventSelector';
@@ -53,6 +54,7 @@ function App() {
     <div className="app">
       <Routes>
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" replace />} />
+        <Route path="/signup" element={!user ? <SignUp /> : <Navigate to="/dashboard" replace />} />
         
         <Route
           path="/dashboard"

@@ -67,6 +67,12 @@ const VoteBetPanel = () => {
   };
 
   const handleVote = async (participantId) => {
+    // Verificar permisos
+    if (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') {
+      alert('No tienes permisos para votar. Contacta al administrador.');
+      return;
+    }
+
     try {
       await createVote(eventId, user.id, participantId);
       setUserVoted(true);
@@ -78,6 +84,12 @@ const VoteBetPanel = () => {
   };
 
   const handleBet = async (participantId) => {
+    // Verificar permisos
+    if (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') {
+      alert('No tienes permisos para apostar. Contacta al administrador.');
+      return;
+    }
+
     if (!betAmount || parseFloat(betAmount) <= 0) {
       alert('Ingrese un monto válido');
       return;
@@ -133,7 +145,7 @@ const VoteBetPanel = () => {
               </div>
 
               <div className="participant-actions">
-                {!userVoted && (
+                {!userVoted && (user.userType !== 'SOLO_VISUALIZAR' && user.userType !== 'NO_PARTICIPA') && (
                   <button
                     onClick={() => handleVote(participant.userId)}
                     className="btn-vote"
@@ -141,6 +153,11 @@ const VoteBetPanel = () => {
                     <Heart size={18} />
                     Votar por favorito
                   </button>
+                )}
+                {(user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') && (
+                  <div className="permission-warning">
+                    <p>⚠️ No tienes permisos para votar/apostar. Contacta al administrador.</p>
+                  </div>
                 )}
 
                 <div className="bet-section">

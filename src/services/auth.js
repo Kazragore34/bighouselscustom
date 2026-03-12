@@ -50,7 +50,7 @@ export const login = async (username, password) => {
   }
 };
 
-// Crear usuario (solo admin)
+// Crear usuario (ahora público, pero con permisos limitados por defecto)
 export const createUser = async (userData) => {
   try {
     const { username, password, userType, email, enabled = true } = userData;
