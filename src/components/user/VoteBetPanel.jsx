@@ -111,9 +111,34 @@ const VoteBetPanel = () => {
     return <div className="loading">Cargando participantes...</div>;
   }
 
+  // Verificar permisos de forma más robusta
+  const canVoteOrBet = user && user.userType && 
+    user.userType !== 'SOLO_VISUALIZAR' && 
+    user.userType !== 'NO_PARTICIPA';
+  
+  const hasNoPermissions = user && user.userType && 
+    (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA');
+
+  // Debug: mostrar userType en consola
+  useEffect(() => {
+    if (user) {
+      console.log('Usuario actual:', user);
+      console.log('userType:', user.userType);
+      console.log('Puede votar/apostar:', canVoteOrBet);
+    }
+  }, [user, canVoteOrBet]);
+
   return (
     <div className="vote-bet-panel">
       <h2>Participantes</h2>
+      
+      {/* Debug info - remover en producción */}
+      {user && (
+        <div style={{ padding: '10px', background: '#f0f0f0', marginBottom: '20px', borderRadius: '8px', fontSize: '0.9rem' }}>
+          <strong>Debug:</strong> Tu tipo de usuario es: <strong>{user.userType}</strong> | 
+          Puedes votar/apostar: <strong>{canVoteOrBet ? 'SÍ' : 'NO'}</strong>
+        </div>
+      )}
       
       <div className="participants-grid">
         {participants.map(participant => {
@@ -148,7 +173,7 @@ const VoteBetPanel = () => {
 
               <div className="participant-actions">
                 {/* Mostrar botón de votar solo si tiene permisos y no ha votado */}
-                {!userVoted && (user.userType !== 'SOLO_VISUALIZAR' && user.userType !== 'NO_PARTICIPA') && (
+                {!userVoted && canVoteOrBet && (
                   <button
                     onClick={() => handleVote(participant.userId)}
                     className="btn-vote"
@@ -166,14 +191,14 @@ const VoteBetPanel = () => {
                 )}
 
                 {/* Mostrar advertencia solo para usuarios sin permisos */}
-                {(user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') && (
+                {hasNoPermissions && (
                   <div className="permission-warning">
                     <p>⚠️ No tienes permisos para votar/apostar. Contacta al administrador.</p>
                   </div>
                 )}
 
                 {/* Sección de apuesta - visible para todos con permisos */}
-                {(user.userType !== 'SOLO_VISUALIZAR' && user.userType !== 'NO_PARTICIPA') && (
+                {canVoteOrBet && (
                   <div className="bet-section">
                     <input
                       type="number"
@@ -190,7 +215,7 @@ const VoteBetPanel = () => {
                     <button
                       onClick={() => handleBet(participant.userId)}
                       className="btn-bet"
-                      disabled={!betAmount || parseFloat(betAmount) <= 0 || (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA')}
+                      disabled={!betAmount || parseFloat(betAmount) <= 0}
                     >
                       <DollarSign size={18} />
                       Apostar
