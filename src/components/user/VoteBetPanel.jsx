@@ -367,6 +367,27 @@ const VoteBetPanel = () => {
         })}
       </div>
 
+      {/* Sección de Brackets - Mostrar siempre, incluso si no hay brackets */}
+      <div className="brackets-section">
+        <div className="brackets-section-header">
+          <h3>📊 Brackets del Evento</h3>
+          <button
+            onClick={() => {
+              console.log('Navegando a brackets para evento:', eventId);
+              navigate(`/events/${eventId}/brackets`);
+            }}
+            className="btn-view-brackets-inline"
+            title="Ver brackets completos del evento"
+          >
+            <GitBranch size={18} />
+            Ver Brackets Completos
+          </button>
+        </div>
+        <p className="brackets-info">
+          Visualiza la estructura de brackets y el progreso de las rondas del evento.
+        </p>
+      </div>
+
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
