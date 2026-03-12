@@ -25,9 +25,13 @@ const Navbar = () => {
         <div className="navbar-menu">
           {isAdmin ? (
             <>
-              <button onClick={() => navigate('/admin/users')}>Usuarios</button>
-              <button onClick={() => navigate('/admin/events')}>Eventos</button>
-              <button onClick={() => navigate('/admin/bets')}>Confirmar Apuestas</button>
+              <button onClick={() => navigate('/dashboard')}>Inicio</button>
+              <button onClick={() => navigate('/events')}>Eventos</button>
+              <button onClick={() => navigate('/winners')}>Ganadores</button>
+              <button onClick={() => navigate('/profile')}>Perfil</button>
+              <button onClick={() => navigate('/admin/users')}>Admin: Usuarios</button>
+              <button onClick={() => navigate('/admin/events')}>Admin: Eventos</button>
+              <button onClick={() => navigate('/admin/bets')}>Admin: Apuestas</button>
             </>
           ) : (
             <>

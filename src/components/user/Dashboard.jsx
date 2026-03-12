@@ -8,10 +8,8 @@ const Dashboard = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  if (isAdmin) {
-    navigate('/admin/users');
-    return null;
-  }
+  // El admin puede ver el dashboard de usuario también
+  // Si quiere ir al panel admin, puede usar el menú de navegación
 
   return (
     <div className="user-dashboard">
