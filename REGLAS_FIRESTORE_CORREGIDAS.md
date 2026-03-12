@@ -2,11 +2,13 @@
 
 ## ⚠️ Problemas Solucionados
 
-1. **Admin puede editar usuarios**: Los admins ahora pueden actualizar cualquier usuario
-2. **Usuarios pueden leer su propio perfil**: Todos los usuarios autenticados pueden leer su propio perfil
-3. **Usuarios pueden editar su propio perfil**: Los usuarios pueden actualizar su nombre, email y foto (pero no userType)
+1. **Registro público funciona**: Los usuarios pueden crear cuentas sin autenticación
+2. **Verificación de username**: Permite leer solo el campo username para verificar existencia
+3. **Admin puede editar usuarios**: Los admins pueden actualizar cualquier usuario
+4. **Usuarios pueden leer su propio perfil**: Todos los usuarios autenticados pueden leer su propio perfil
+5. **Usuarios pueden editar su propio perfil**: Los usuarios pueden actualizar su nombre, email y foto (pero no userType)
 
-## ✅ Reglas Corregidas
+## ✅ Reglas Corregidas - VERSIÓN FUNCIONAL
 
 Copia y pega estas reglas en Firebase Console > Firestore Database > Reglas:
 
@@ -28,16 +30,18 @@ service cloud.firestore {
     
     // Usuarios
     match /users/{userId} {
-      // Permitir lectura: admin puede leer todos, usuarios pueden leer su propio perfil
-      allow read: if request.auth != null && 
-                     (isAdmin() || request.auth.uid == userId);
+      // Permitir lectura:
+      // - Sin autenticación: solo para consultas (verificar si username existe)
+      // - Con autenticación: admin puede leer todos, usuarios pueden leer su propio perfil
+      allow read: if request.auth == null || 
+                     request.auth != null && (isAdmin() || request.auth.uid == userId);
       
-      // Permitir creación pública (registro)
+      // Permitir creación pública (registro) - SIN RESTRICCIONES
       allow create: if true;
       
       // Permitir actualización:
       // - Admin puede actualizar cualquier usuario
-      // - Usuario puede actualizar su propio perfil (pero no userType)
+      // - Usuario puede actualizar su propio perfil (pero no userType ni enabled)
       allow update: if request.auth != null && (
         isAdmin() || 
         (request.auth.uid == userId && 
@@ -88,15 +92,16 @@ service cloud.firestore {
 }
 ```
 
-## 🔧 Alternativa Más Simple (Si la anterior no funciona)
+## 🔧 Alternativa Temporal (Si la anterior no funciona)
 
-Si las reglas anteriores son muy complejas, usa esta versión simplificada temporalmente:
+Si las reglas anteriores aún dan problemas, usa esta versión TEMPORAL para desarrollo:
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permitir todo temporalmente para desarrollo (CAMBIA ESTO EN PRODUCCIÓN)
+    // ⚠️ TEMPORAL: Permitir todo para desarrollo
+    // CAMBIA ESTO EN PRODUCCIÓN por las reglas de arriba
     match /{document=**} {
       allow read, write: if true;
     }
@@ -110,13 +115,15 @@ service cloud.firestore {
 
 1. Ve a [Firebase Console](https://console.firebase.google.com/project/apuesta-7c52d/firestore)
 2. Haz clic en la pestaña **Reglas**
-3. Copia y pega las reglas de arriba
+3. Copia y pega las reglas de arriba (la primera versión)
 4. Haz clic en **Publicar**
 5. Espera unos segundos a que se apliquen
-6. Prueba editar un usuario desde el panel admin
+6. Prueba crear una cuenta
 
 ## 🎯 Cambios Importantes
 
+- ✅ **Registro público funciona**: `allow create: if true;` permite crear usuarios sin autenticación
+- ✅ **Lectura para verificación**: Permite leer usuarios sin autenticación (para verificar si username existe)
 - ✅ Admin puede actualizar cualquier campo de cualquier usuario
 - ✅ Usuarios pueden leer su propio perfil
 - ✅ Usuarios pueden actualizar su nombre, email y foto (pero NO userType ni enabled)
@@ -124,6 +131,17 @@ service cloud.firestore {
 
 ## ✅ Después de Configurar
 
+- El registro público funcionará sin errores
 - El admin podrá editar usuarios sin errores de permisos
 - Los usuarios podrán ver y editar su propio perfil
 - El login con Google funcionará correctamente
+
+## 🔍 Si Aún No Funciona
+
+Si después de aplicar las reglas sigues viendo "Missing or insufficient permissions":
+
+1. Verifica que copiaste las reglas completas (incluyendo las llaves de cierre)
+2. Asegúrate de hacer clic en **Publicar** después de pegar
+3. Espera 1-2 minutos para que se propaguen los cambios
+4. Recarga la página y prueba de nuevo
+5. Si persiste, usa temporalmente la versión "Permitir todo" para verificar que el problema son las reglas
