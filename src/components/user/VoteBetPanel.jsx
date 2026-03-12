@@ -58,12 +58,24 @@ const VoteBetPanel = () => {
         return;
       }
       
-      // Si no hay oficiales, regenerar preview
-      if (participants.length > 0) {
+      // Si no hay oficiales, regenerar preview con participantes actuales
+      const currentParticipants = await getEventParticipants(eventId);
+      if (currentParticipants.length > 0) {
+        const participantsWithData = await Promise.all(
+          currentParticipants.map(async (p) => {
+            try {
+              const userData = await getUserById(p.userId);
+              return { ...p, ...userData };
+            } catch (err) {
+              return { ...p, username: p.userId };
+            }
+          })
+        );
+        
         const event = await getEventById(eventId);
         const bracketType = event.bracketType || '1v1';
         const participantsPerBracket = event.participantsPerBracket || 2;
-        const preview = generatePreviewBrackets(participants, bracketType, participantsPerBracket);
+        const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
         setPreviewBrackets(preview);
       }
     } catch (error) {
