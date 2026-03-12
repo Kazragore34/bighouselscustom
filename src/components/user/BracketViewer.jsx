@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getBracketsByEvent } from '../../services/brackets';
 import { getUserById } from '../../services/users';
-import { Trophy } from 'lucide-react';
+import { Trophy, ArrowLeft } from 'lucide-react';
 import './BracketViewer.css';
-
-import { useParams } from 'react-router-dom';
 
 const BracketViewer = () => {
   const { eventId } = useParams();
+  const navigate = useNavigate();
   const [brackets, setBrackets] = useState([]);
   const [participants, setParticipants] = useState({});
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,17 @@ const BracketViewer = () => {
 
   return (
     <div className="bracket-viewer">
-      <h2>Brackets del Evento</h2>
+      <div className="bracket-header">
+        <button
+          onClick={() => navigate(`/events/${eventId}`)}
+          className="btn-back"
+          title="Volver al evento"
+        >
+          <ArrowLeft size={18} />
+          Volver al Evento
+        </button>
+        <h2>Brackets del Evento</h2>
+      </div>
       
       {brackets.map((bracket, bracketIndex) => (
         <div key={bracketIndex} className="bracket-round">

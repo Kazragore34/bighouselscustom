@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getEventParticipants, getEventById } from '../../services/events';
 import { getUserById } from '../../services/users';
 import { createVote, hasUserVoted, getVoteCountsByEvent } from '../../services/votes';
@@ -7,13 +7,14 @@ import { createBet } from '../../services/bets';
 import { calculateOdds } from '../../utils/prizeCalculator';
 import { useAuth } from '../../context/AuthContext';
 import PaymentModal from '../shared/PaymentModal';
-import { Heart, DollarSign, Trophy, TrendingUp } from 'lucide-react';
+import { Heart, DollarSign, Trophy, TrendingUp, GitBranch } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import './VoteBetPanel.css';
 
 const VoteBetPanel = () => {
   const { eventId } = useParams();
+  const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [participants, setParticipants] = useState([]);
   const [voteCounts, setVoteCounts] = useState({});
