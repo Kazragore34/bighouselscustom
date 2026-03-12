@@ -76,8 +76,74 @@
   font-size: 0.9rem;
 }
 
+.top-voted-section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+.top-voted-section h2 {
+  color: #e0e0e0;
+  margin-bottom: 20px;
+  font-size: 1.8rem;
+  text-align: center;
+}
+
+.top-voted-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.top-voted-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 15px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.top-voted-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  border-color: rgba(102, 126, 234, 0.5);
+}
+
+.top-voted-card h3 {
+  margin: 0 0 15px 0;
+  color: #e0e0e0;
+  font-size: 1.2rem;
+}
+
+.top-voted-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.top-voted-name {
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.top-voted-count {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #ff6b6b;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 768px) {
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .top-voted-grid {
+    grid-template-columns: 1fr;
   }
 }

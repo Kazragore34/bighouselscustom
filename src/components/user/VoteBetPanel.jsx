@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getEventParticipants } from '../../services/events';
+import { getEventParticipants, getEventById } from '../../services/events';
 import { getUserById } from '../../services/users';
 import { createVote, hasUserVoted, getVoteCountsByEvent } from '../../services/votes';
 import { createBet } from '../../services/bets';
@@ -8,6 +8,8 @@ import { calculateOdds } from '../../utils/prizeCalculator';
 import { useAuth } from '../../context/AuthContext';
 import PaymentModal from '../shared/PaymentModal';
 import { Heart, DollarSign, Trophy, TrendingUp } from 'lucide-react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import './VoteBetPanel.css';
 
 const VoteBetPanel = () => {
@@ -19,8 +21,9 @@ const VoteBetPanel = () => {
   const [loading, setLoading] = useState(true);
   const [userVoted, setUserVoted] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedParticipant, setSelectedParticipant] = useState(null);
-  const [betAmount, setBetAmount] = useState('');
+  const [betAmounts, setBetAmounts] = useState({}); // Objeto con participantId -> amount
+  const [userBets, setUserBets] = useState({}); // Objeto con participantId -> array de apuestas
+  const [eventData, setEventData] = useState(null); // Datos del evento para validar fecha límite
 
   useEffect(() => {
     if (user && user.id && eventId) {
@@ -39,6 +42,10 @@ const VoteBetPanel = () => {
 
     try {
       setLoading(true);
+      
+      // Cargar datos del evento (para validar fecha límite)
+      const event = await getEventById(eventId);
+      setEventData(event);
       
       // Cargar participantes
       const participantsData = await getEventParticipants(eventId);
@@ -84,6 +91,27 @@ const VoteBetPanel = () => {
       const oddsResults = await Promise.all(oddsPromises);
       const oddsMap = Object.assign({}, ...oddsResults);
       setOddsData(oddsMap);
+
+      // Cargar apuestas del usuario por participante
+      const betsRef = collection(db, 'bets');
+      const userBetsQuery = query(
+        betsRef,
+        where('eventId', '==', eventId),
+        where('userId', '==', user.id)
+      );
+      const userBetsSnapshot = await getDocs(userBetsQuery);
+      const betsByParticipant = {};
+      userBetsSnapshot.docs.forEach(doc => {
+        const bet = doc.data();
+        if (!betsByParticipant[bet.participantId]) {
+          betsByParticipant[bet.participantId] = [];
+        }
+        betsByParticipant[bet.participantId].push({
+          id: doc.id,
+          ...bet
+        });
+      });
+      setUserBets(betsByParticipant);
     } catch (error) {
       console.error('Error cargando datos:', error);
       alert('Error al cargar los datos del evento. Por favor, recarga la página.');
@@ -92,12 +120,26 @@ const VoteBetPanel = () => {
     }
   };
 
+  const isBettingClosed = () => {
+    if (!eventData || !eventData.betDeadline) return false;
+    const deadline = new Date(eventData.betDeadline);
+    const now = new Date();
+    return now > deadline;
+  };
+
   const handleVote = async (participantId) => {
     // Verificar permisos - Solo bloqueamos SOLO_VISUALIZAR
     if (user.userType === 'SOLO_VISUALIZAR') {
       alert('No tienes permisos para votar. Contacta al administrador.');
       return;
     }
+    
+    // Verificar fecha límite
+    if (isBettingClosed()) {
+      alert('⚠️ El plazo para votar ha expirado. La fecha límite era: ' + new Date(eventData.betDeadline).toLocaleString('es-ES'));
+      return;
+    }
+    
     // Admin, PARTICIPANTE y VOTANTE_APOSTADOR pueden votar
 
     try {
@@ -116,17 +158,26 @@ const VoteBetPanel = () => {
       alert('No tienes permisos para apostar. Contacta al administrador.');
       return;
     }
+    
+    // Verificar fecha límite
+    if (isBettingClosed()) {
+      alert('⚠️ El plazo para apostar ha expirado. La fecha límite era: ' + new Date(eventData.betDeadline).toLocaleString('es-ES'));
+      return;
+    }
+    
     // Admin, PARTICIPANTE y VOTANTE_APOSTADOR pueden apostar
 
-    if (!betAmount || parseFloat(betAmount) <= 0) {
+    const amount = betAmounts[participantId];
+    if (!amount || parseFloat(amount) <= 0) {
       alert('Ingrese un monto válido');
       return;
     }
 
     try {
-      await createBet(eventId, user.id, participantId, betAmount);
+      await createBet(eventId, user.id, participantId, amount);
       setShowPaymentModal(true);
-      setBetAmount('');
+      // Limpiar solo el monto de este participante
+      setBetAmounts({ ...betAmounts, [participantId]: '' });
       await loadData(); // Recargar datos
     } catch (error) {
       alert(error.message || 'Error al crear apuesta');
@@ -157,6 +208,17 @@ const VoteBetPanel = () => {
   return (
     <div className="vote-bet-panel">
       <h2>Participantes</h2>
+      
+      {/* Mostrar fecha límite si existe */}
+      {eventData && eventData.betDeadline && (
+        <div className={`deadline-warning ${isBettingClosed() ? 'closed' : 'open'}`}>
+          {isBettingClosed() ? (
+            <p>⚠️ <strong>El plazo para apostar/votar ha expirado</strong> - Fecha límite: {new Date(eventData.betDeadline).toLocaleString('es-ES')}</p>
+          ) : (
+            <p>⏰ <strong>Fecha límite para apostar/votar:</strong> {new Date(eventData.betDeadline).toLocaleString('es-ES')}</p>
+          )}
+        </div>
+      )}
       
       {/* Debug info - remover en producción */}
       {user && (
@@ -225,35 +287,64 @@ const VoteBetPanel = () => {
 
                 {/* Sección de apuesta - visible para todos con permisos */}
                 {canVoteOrBet && (
-                  <div className="bet-section">
-                    <input
-                      type="number"
-                      placeholder="Monto a apostar"
-                      value={selectedParticipant === participant.userId ? betAmount : ''}
-                      onChange={(e) => {
-                        setBetAmount(e.target.value);
-                        setSelectedParticipant(participant.userId);
-                      }}
-                      min="0"
-                      step="0.01"
-                      className="bet-input"
-                    />
-                    <button
-                      onClick={() => handleBet(participant.userId)}
-                      className="btn-bet"
-                      disabled={!betAmount || parseFloat(betAmount) <= 0}
-                    >
-                      <DollarSign size={18} />
-                      Apostar
-                    </button>
-                  </div>
-                )}
-
-                {odds.payoutMultiplier > 1 && (
-                  <div className="payout-info">
-                    <Trophy size={14} />
-                    <span>Ganarías: ${(parseFloat(betAmount || 0) * odds.payoutMultiplier).toFixed(2)}</span>
-                  </div>
+                  <>
+                    <div className="bet-section">
+                      <input
+                        type="number"
+                        placeholder="Monto a apostar"
+                        value={betAmounts[participant.userId] || ''}
+                        onChange={(e) => {
+                          setBetAmounts({
+                            ...betAmounts,
+                            [participant.userId]: e.target.value
+                          });
+                        }}
+                        min="0"
+                        step="0.01"
+                        className="bet-input"
+                      />
+                      <button
+                        onClick={() => handleBet(participant.userId)}
+                        className="btn-bet"
+                        disabled={!betAmounts[participant.userId] || parseFloat(betAmounts[participant.userId] || 0) <= 0}
+                      >
+                        <DollarSign size={18} />
+                        Apostar
+                      </button>
+                    </div>
+                    
+                    {/* Mostrar ganancias potenciales siempre */}
+                    {betAmounts[participant.userId] && parseFloat(betAmounts[participant.userId]) > 0 && (
+                      <div className="payout-info">
+                        <Trophy size={14} />
+                        <span>Ganarías: ${(parseFloat(betAmounts[participant.userId]) * odds.payoutMultiplier).toFixed(2)}</span>
+                      </div>
+                    )}
+                    
+                    {/* Mostrar apuestas existentes del usuario */}
+                    {userBets[participant.userId] && userBets[participant.userId].length > 0 && (
+                      <div className="existing-bets-info">
+                        <p className="existing-bets-title">Tus apuestas:</p>
+                        {userBets[participant.userId].map((bet) => (
+                          <div key={bet.id} className="existing-bet-item">
+                            <span>${bet.amount.toFixed(2)}</span>
+                            <span className="bet-status">{bet.status === 'confirmed' ? '✓ Confirmada' : '⏳ Pendiente'}</span>
+                            {bet.status === 'confirmed' && (
+                              <span className="potential-winnings">
+                                Ganarías: ${(bet.amount * odds.payoutMultiplier).toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        <div className="total-bet-info">
+                          <strong>Total apostado: ${userBets[participant.userId]
+                            .filter(b => b.status === 'confirmed')
+                            .reduce((sum, b) => sum + b.amount, 0)
+                            .toFixed(2)}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

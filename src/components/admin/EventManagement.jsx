@@ -21,7 +21,10 @@ const EventManagement = () => {
     icon: 'trophy',
     status: 'draft',
     bannerURL: '',
-    bannerFile: null
+    bannerFile: null,
+    betDeadline: '', // Fecha/hora límite para apostar/votar
+    startDate: '',
+    endDate: ''
   });
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -117,7 +120,10 @@ const EventManagement = () => {
       icon: event.icon || 'trophy',
       status: event.status || 'draft',
       bannerURL: event.bannerURL || '',
-      bannerFile: null
+      bannerFile: null,
+      betDeadline: event.betDeadline || '',
+      startDate: event.startDate || '',
+      endDate: event.endDate || ''
     });
     
     // Cargar participantes del evento
@@ -179,7 +185,10 @@ const EventManagement = () => {
       icon: 'trophy',
       status: 'draft',
       bannerURL: '',
-      bannerFile: null
+      bannerFile: null,
+      betDeadline: '',
+      startDate: '',
+      endDate: ''
     });
     setSelectedParticipants([]);
     setEditingEvent(null);
@@ -381,6 +390,17 @@ const EventManagement = () => {
                 <option value="active">Activo</option>
                 <option value="finished">Finalizado</option>
               </select>
+            </div>
+
+            <div className="form-group">
+              <label>Fecha/Hora Límite para Apostar/Votar</label>
+              <input
+                type="datetime-local"
+                value={formData.betDeadline || ''}
+                onChange={(e) => setFormData({ ...formData, betDeadline: e.target.value })}
+                placeholder="Fecha límite para apostar/votar"
+              />
+              <p className="help-text">⚠️ Después de esta fecha no se podrán realizar apuestas ni votos</p>
             </div>
 
             <div className="form-group">

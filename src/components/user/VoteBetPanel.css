@@ -151,6 +151,9 @@
 .btn-bet {
   background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
   color: white;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .btn-bet:hover:not(:disabled) {
@@ -163,9 +166,60 @@
   cursor: not-allowed;
 }
 
+.existing-bets-info {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.existing-bets-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.existing-bet-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 0.85rem;
+}
+
+.existing-bet-item:last-child {
+  border-bottom: none;
+}
+
+.bet-status {
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fff3cd;
+  color: #856404;
+}
+
+.potential-winnings {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.total-bet-info {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px solid #667eea;
+  color: #333;
+  font-size: 0.9rem;
+}
+
 .bet-section {
   display: flex;
   gap: 10px;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
 .bet-input {
@@ -199,6 +253,30 @@
   padding: 50px;
   font-size: 1.2rem;
   color: #666;
+}
+
+.deadline-warning {
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.deadline-warning.open {
+  background: #d1ecf1;
+  border: 2px solid #0c5460;
+  color: #0c5460;
+}
+
+.deadline-warning.closed {
+  background: #f8d7da;
+  border: 2px solid #721c24;
+  color: #721c24;
+}
+
+.deadline-warning p {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .permission-warning {

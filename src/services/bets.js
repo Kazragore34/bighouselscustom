@@ -12,24 +12,10 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 
-// Crear apuesta
+// Crear apuesta (permite múltiples apuestas al mismo participante)
 export const createBet = async (eventId, userId, participantId, amount) => {
   try {
-    // Verificar que el usuario no haya apostado ya por este participante en este evento
-    const betsRef = collection(db, 'bets');
-    const q = query(
-      betsRef,
-      where('eventId', '==', eventId),
-      where('userId', '==', userId),
-      where('participantId', '==', participantId)
-    );
-    const existingBets = await getDocs(q);
-
-    if (!existingBets.empty) {
-      throw new Error('Ya has apostado por este participante en este evento');
-    }
-
-    // Crear la apuesta con estado pendiente
+    // Crear la apuesta con estado pendiente (permitir múltiples apuestas)
     const newBetRef = doc(collection(db, 'bets'));
     await setDoc(newBetRef, {
       eventId,
@@ -121,17 +107,24 @@ export const confirmBet = async (betId, adminUserId) => {
 export const getBetsByUser = async (userId) => {
   try {
     const betsRef = collection(db, 'bets');
+    // Solo filtrar por userId, ordenar en memoria para evitar necesidad de índice
     const q = query(
       betsRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', userId)
     );
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({
+    const bets = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    // Ordenar en memoria por createdAt descendente
+    return bets.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || 0;
+      const bTime = b.createdAt?.toMillis?.() || 0;
+      return bTime - aTime; // Descendente
+    });
   } catch (error) {
     throw error;
   }
