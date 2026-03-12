@@ -24,13 +24,17 @@ const EventSelector = () => {
   const loadEvents = async () => {
     try {
       setLoading(true);
-      // Mostrar eventos activos y draft (para que el admin pueda ver los que creó)
-      const activeEvents = await getActiveEvents();
-      // También obtener eventos draft si es necesario
+      // Mostrar TODOS los eventos (activos, draft, etc.) para que los usuarios puedan verlos
       const allEvents = await getAllEvents();
-      const draftEvents = allEvents.filter(e => e.status === 'draft');
-      // Combinar y mostrar activos primero, luego drafts
-      setEvents([...activeEvents, ...draftEvents]);
+      // Filtrar solo eventos activos y draft (no mostrar finished)
+      const visibleEvents = allEvents.filter(e => e.status === 'active' || e.status === 'draft');
+      // Ordenar: activos primero, luego drafts
+      const sortedEvents = visibleEvents.sort((a, b) => {
+        if (a.status === 'active' && b.status !== 'active') return -1;
+        if (a.status !== 'active' && b.status === 'active') return 1;
+        return 0;
+      });
+      setEvents(sortedEvents);
     } catch (error) {
       console.error('Error cargando eventos:', error);
     } finally {

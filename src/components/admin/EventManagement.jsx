@@ -217,19 +217,30 @@ const EventManagement = () => {
                   Editar
                 </button>
                 <button 
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    e.stopPropagation(); // Evitar que se propague el evento
                     try {
+                      console.log('Cargando participantes para evento:', event.id);
                       const participants = await getEventParticipants(event.id);
+                      console.log('Participantes encontrados:', participants);
                       const participantsWithData = await Promise.all(
                         participants.map(async (p) => {
-                          const userData = await getUserById(p.userId);
-                          return { ...p, ...userData };
+                          try {
+                            const userData = await getUserById(p.userId);
+                            return { ...p, ...userData };
+                          } catch (err) {
+                            console.error('Error cargando usuario:', p.userId, err);
+                            return { ...p, username: 'Usuario no encontrado', name: 'Usuario no encontrado' };
+                          }
                         })
                       );
+                      console.log('Participantes con datos:', participantsWithData);
                       setEventParticipants(participantsWithData);
                       setCurrentEventForParticipants(event);
                       setShowParticipantsModal(true);
+                      console.log('Modal de participantes abierto');
                     } catch (error) {
+                      console.error('Error completo:', error);
                       alert('Error cargando participantes: ' + error.message);
                     }
                   }}
