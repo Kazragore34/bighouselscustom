@@ -147,6 +147,7 @@ const VoteBetPanel = () => {
               </div>
 
               <div className="participant-actions">
+                {/* Mostrar botón de votar solo si tiene permisos y no ha votado */}
                 {!userVoted && (user.userType !== 'SOLO_VISUALIZAR' && user.userType !== 'NO_PARTICIPA') && (
                   <button
                     onClick={() => handleVote(participant.userId)}
@@ -156,34 +157,46 @@ const VoteBetPanel = () => {
                     Votar por favorito
                   </button>
                 )}
+                
+                {/* Mostrar mensaje si ya votó */}
+                {userVoted && (
+                  <div className="voted-message">
+                    <p>✓ Ya votaste en este evento</p>
+                  </div>
+                )}
+
+                {/* Mostrar advertencia solo para usuarios sin permisos */}
                 {(user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') && (
                   <div className="permission-warning">
                     <p>⚠️ No tienes permisos para votar/apostar. Contacta al administrador.</p>
                   </div>
                 )}
 
-                <div className="bet-section">
-                  <input
-                    type="number"
-                    placeholder="Monto a apostar"
-                    value={selectedParticipant === participant.userId ? betAmount : ''}
-                    onChange={(e) => {
-                      setBetAmount(e.target.value);
-                      setSelectedParticipant(participant.userId);
-                    }}
-                    min="0"
-                    step="0.01"
-                    className="bet-input"
-                  />
-                  <button
-                    onClick={() => handleBet(participant.userId)}
-                    className="btn-bet"
-                    disabled={!betAmount || parseFloat(betAmount) <= 0}
-                  >
-                    <DollarSign size={18} />
-                    Apostar
-                  </button>
-                </div>
+                {/* Sección de apuesta - visible para todos con permisos */}
+                {(user.userType !== 'SOLO_VISUALIZAR' && user.userType !== 'NO_PARTICIPA') && (
+                  <div className="bet-section">
+                    <input
+                      type="number"
+                      placeholder="Monto a apostar"
+                      value={selectedParticipant === participant.userId ? betAmount : ''}
+                      onChange={(e) => {
+                        setBetAmount(e.target.value);
+                        setSelectedParticipant(participant.userId);
+                      }}
+                      min="0"
+                      step="0.01"
+                      className="bet-input"
+                    />
+                    <button
+                      onClick={() => handleBet(participant.userId)}
+                      className="btn-bet"
+                      disabled={!betAmount || parseFloat(betAmount) <= 0 || (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA')}
+                    >
+                      <DollarSign size={18} />
+                      Apostar
+                    </button>
+                  </div>
+                )}
 
                 {odds.payoutMultiplier > 1 && (
                   <div className="payout-info">

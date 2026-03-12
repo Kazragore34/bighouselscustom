@@ -41,7 +41,9 @@ const EventManagement = () => {
         getAllUsers()
       ]);
       setEvents(eventsData);
-      setUsers(usersData.filter(u => u.enabled && (u.userType === 'PARTICIPANTE' || u.userType === 'VOTANTE_APOSTADOR')));
+      // Mostrar solo usuarios PARTICIPANTE para agregar como participantes del evento
+      // VOTANTE_APOSTADOR puede votar/apostar pero NO aparece en la lista de participantes
+      setUsers(usersData.filter(u => u.enabled && u.userType === 'PARTICIPANTE'));
     } catch (error) {
       console.error('Error cargando datos:', error);
     } finally {
