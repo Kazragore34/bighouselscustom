@@ -64,7 +64,11 @@ const BracketEditor = () => {
     }
 
     try {
-      await generateSmartBrackets(eventId, participants, 'custom', 2);
+      // Obtener el tipo de bracket del evento
+      const bracketType = event?.bracketType || '1v1';
+      const participantsPerBracket = event?.participantsPerBracket || 2;
+      
+      await generateSmartBrackets(eventId, participants, bracketType, participantsPerBracket);
       alert('Brackets generados exitosamente');
       loadData();
     } catch (error) {

@@ -187,9 +187,12 @@ const generateTournamentRounds = (participants, bracketType, participantsPerBrac
     // En la práctica, el admin establecerá los ganadores y se generará la siguiente ronda
     if (matches.length <= 1) break; // Si solo queda un match, es la final
     
-    // Simular que avanzan todos (en realidad el admin establecerá ganadores)
-    currentRoundParticipants = matches.map(() => ({ id: 'pending' }));
+    // No crear participantes "pending" - la siguiente ronda se generará cuando se establezcan ganadores
+    // Por ahora, solo avanzar al siguiente roundNumber
     roundNumber++;
+    
+    // Si no hay más participantes para la siguiente ronda, terminar
+    if (matches.length === 0) break;
   }
 
   return rounds;
