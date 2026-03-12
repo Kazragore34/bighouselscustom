@@ -38,15 +38,10 @@ export const calculateOdds = async (eventId, participantId) => {
     // Calcular ratio de dinero apostado (peso secundario: 25%)
     const betRatio = participantBetAmount / totalBetAmount;
 
-    // MEDIDAS ANTI-MANIPULACIÓN:
+    // MEDIDAS ANTI-MANIPULACIÓN (Adaptadas para dinero ficticio de juego):
     
-    // 1. Normalizar el impacto del dinero usando logaritmo
-    // Esto reduce el impacto de grandes apuestas individuales
-    const normalizedBetRatio = betRatio > 0 
-      ? Math.log10(betRatio * 9 + 1) / Math.log10(10) // Normalizar entre 0 y 1
-      : 0;
-
-    // 2. Considerar cantidad de apostadores únicos (más apostadores = más legítimo)
+    // 1. Considerar cantidad de apostadores únicos (más apostadores = más legítimo)
+    // Esto es más importante que el monto individual en dinero ficticio
     const uniqueBettors = new Set(
       confirmedBets
         .filter(bet => bet.participantId === participantId)
@@ -55,21 +50,29 @@ export const calculateOdds = async (eventId, participantId) => {
     const totalUniqueBettors = new Set(confirmedBets.map(bet => bet.userId)).size;
     const bettorDiversity = totalUniqueBettors > 0 ? uniqueBettors / totalUniqueBettors : 0;
 
-    // 3. Factor de concentración (si mucho dinero viene de pocos apostadores, es sospechoso)
+    // 2. Factor de concentración suave (solo penaliza casos extremos)
+    // En dinero ficticio, es normal que haya grandes diferencias, pero si TODO viene de 1-2 personas, es sospechoso
     const participantBets = confirmedBets.filter(bet => bet.participantId === participantId);
     const avgBetPerBettor = uniqueBettors > 0 ? participantBetAmount / uniqueBettors : 0;
     const totalAvgBetPerBettor = totalUniqueBettors > 0 ? totalBetAmount / totalUniqueBettors : 0;
     
-    // Si la apuesta promedio por apostador es mucho mayor que el promedio general, reducir su impacto
-    const concentrationFactor = totalAvgBetPerBettor > 0 
-      ? Math.min(1, totalAvgBetPerBettor / Math.max(avgBetPerBettor, totalAvgBetPerBettor))
-      : 1;
+    // Solo penalizar si la concentración es EXTREMA (más de 10x el promedio y pocos apostadores)
+    let concentrationFactor = 1;
+    if (totalAvgBetPerBettor > 0 && uniqueBettors > 0 && uniqueBettors <= 2) {
+      const concentrationRatio = avgBetPerBettor / totalAvgBetPerBettor;
+      // Solo reducir si es más de 10x el promedio Y hay 1-2 apostadores únicos
+      if (concentrationRatio > 10) {
+        concentrationFactor = Math.max(0.5, 10 / concentrationRatio); // Reducción suave
+      }
+    }
 
-    // 4. Ajustar el betRatio con factores anti-manipulación
-    const adjustedBetRatio = normalizedBetRatio * bettorDiversity * concentrationFactor;
+    // 3. Ajustar el betRatio con factores anti-manipulación
+    // En dinero ficticio, el monto es menos importante que la diversidad de apostadores
+    // Usamos betRatio directamente pero lo multiplicamos por diversidad y concentración
+    const adjustedBetRatio = betRatio * bettorDiversity * concentrationFactor;
 
-    // Fórmula mejorada: VOTOS tienen 75% de peso, DINERO solo 25% (y normalizado)
-    // Esto protege contra manipulación donde pocos apostadores grandes distorsionan las odds
+    // Fórmula mejorada: VOTOS tienen 75% de peso, DINERO solo 25% (ajustado por diversidad)
+    // En dinero ficticio, protegemos contra manipulación pero permitimos grandes apuestas legítimas
     const popularityScore = voteRatio * 0.75 + adjustedBetRatio * 0.25;
     const inversePopularity = 1 - popularityScore;
 
