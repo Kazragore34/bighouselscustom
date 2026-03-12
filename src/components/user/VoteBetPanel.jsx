@@ -67,8 +67,8 @@ const VoteBetPanel = () => {
   };
 
   const handleVote = async (participantId) => {
-    // Verificar permisos - Admin puede votar, solo bloqueamos SOLO_VISUALIZAR y NO_PARTICIPA
-    if (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') {
+    // Verificar permisos - Solo bloqueamos SOLO_VISUALIZAR
+    if (user.userType === 'SOLO_VISUALIZAR') {
       alert('No tienes permisos para votar. Contacta al administrador.');
       return;
     }
@@ -85,8 +85,8 @@ const VoteBetPanel = () => {
   };
 
   const handleBet = async (participantId) => {
-    // Verificar permisos - Admin puede apostar, solo bloqueamos SOLO_VISUALIZAR y NO_PARTICIPA
-    if (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA') {
+    // Verificar permisos - Solo bloqueamos SOLO_VISUALIZAR
+    if (user.userType === 'SOLO_VISUALIZAR') {
       alert('No tienes permisos para apostar. Contacta al administrador.');
       return;
     }
@@ -112,12 +112,8 @@ const VoteBetPanel = () => {
   }
 
   // Verificar permisos de forma más robusta
-  const canVoteOrBet = user && user.userType && 
-    user.userType !== 'SOLO_VISUALIZAR' && 
-    user.userType !== 'NO_PARTICIPA';
-  
-  const hasNoPermissions = user && user.userType && 
-    (user.userType === 'SOLO_VISUALIZAR' || user.userType === 'NO_PARTICIPA');
+  const canVoteOrBet = user && user.userType && user.userType !== 'SOLO_VISUALIZAR';
+  const hasNoPermissions = user && user.userType && user.userType === 'SOLO_VISUALIZAR';
 
   // Debug: mostrar userType en consola
   useEffect(() => {

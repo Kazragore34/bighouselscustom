@@ -283,7 +283,6 @@ const UserManagement = () => {
                 onChange={(e) => setFormData({ ...formData, userType: e.target.value })}
               >
                 <option value="SOLO_VISUALIZAR">Solo Visualizar</option>
-                <option value="NO_PARTICIPA">No Participa</option>
                 <option value="PARTICIPANTE">Participante</option>
                 <option value="VOTANTE_APOSTADOR">Votante/Apostador</option>
                 <option value="ADMIN">Admin</option>

@@ -20,7 +20,7 @@ service cloud.firestore {
       
       // Creación: Solo permitir tipos de usuario válidos (no ADMIN)
       allow create: if request.resource.data.keys().hasAll(['username', 'password', 'userType', 'enabled']) &&
-                       request.resource.data.userType in ['SOLO_VISUALIZAR', 'NO_PARTICIPA', 'PARTICIPANTE', 'VOTANTE_APOSTADOR'] &&
+                       request.resource.data.userType in ['SOLO_VISUALIZAR', 'PARTICIPANTE', 'VOTANTE_APOSTADOR'] &&
                        request.resource.data.userType != 'ADMIN';
       
       // Actualización: Permitir (el frontend valida permisos)
