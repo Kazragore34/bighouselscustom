@@ -211,14 +211,22 @@ const EventManagement = () => {
                 <span className="badge badge-status">{event.status}</span>
                 <span className="badge badge-commission">Comisión: {event.houseCommission}%</span>
               </div>
-              <div className="event-actions">
-                <button onClick={() => handleEditEvent(event)} className="btn-edit">
+              <div className="event-actions" onClick={(e) => e.stopPropagation()}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleEditEvent(event);
+                  }} 
+                  className="btn-edit"
+                >
                   <Edit size={16} />
                   Editar
                 </button>
                 <button 
                   onClick={async (e) => {
-                    e.stopPropagation(); // Evitar que se propague el evento
+                    e.stopPropagation();
+                    e.preventDefault();
                     try {
                       console.log('Cargando participantes para evento:', event.id);
                       const participants = await getEventParticipants(event.id);
@@ -250,7 +258,14 @@ const EventManagement = () => {
                   <Users size={16} />
                   Participantes
                 </button>
-                <button onClick={() => handleDeleteEvent(event.id)} className="btn-delete">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleDeleteEvent(event.id);
+                  }} 
+                  className="btn-delete"
+                >
                   <Trash2 size={16} />
                   Eliminar
                 </button>

@@ -16,11 +16,20 @@
   overflow: hidden;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+  cursor: default; /* No cursor pointer en toda la card */
 }
 
 .event-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.event-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 10; /* Asegurar que los botones estén por encima */
 }
 
 .event-banner {
