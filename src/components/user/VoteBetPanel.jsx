@@ -23,10 +23,17 @@ const VoteBetPanel = () => {
   const [betAmount, setBetAmount] = useState('');
 
   useEffect(() => {
-    loadData();
-  }, [eventId]);
+    if (user && eventId) {
+      loadData();
+    }
+  }, [eventId, user]);
 
   const loadData = async () => {
+    if (!user || !user.id || !eventId) {
+      console.error('No hay usuario o eventId:', { user, eventId });
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -36,31 +43,47 @@ const VoteBetPanel = () => {
       // Cargar datos de usuarios
       const participantsWithData = await Promise.all(
         participantsData.map(async (p) => {
-          const userData = await getUserById(p.userId);
-          return { ...p, ...userData };
+          try {
+            const userData = await getUserById(p.userId);
+            return { ...p, ...userData };
+          } catch (error) {
+            console.error('Error cargando usuario participante:', p.userId, error);
+            return { ...p, username: 'Usuario no encontrado', name: 'Usuario no encontrado' };
+          }
         })
       );
 
       setParticipants(participantsWithData);
 
       // Cargar conteo de votos
-      const votes = await getVoteCountsByEvent(eventId);
+      const votes = await getVoteCountsByEvent(eventId).catch(() => ({}));
       setVoteCounts(votes);
 
       // Verificar si el usuario ya votó
-      const hasVoted = await hasUserVoted(eventId, user.id);
-      setUserVoted(hasVoted);
+      try {
+        const hasVoted = await hasUserVoted(eventId, user.id);
+        setUserVoted(hasVoted);
+      } catch (error) {
+        console.error('Error verificando voto:', error);
+        setUserVoted(false);
+      }
 
       // Cargar odds para cada participante
       const oddsPromises = participantsWithData.map(async (p) => {
-        const odds = await calculateOdds(eventId, p.userId);
-        return { [p.userId]: odds };
+        try {
+          const odds = await calculateOdds(eventId, p.userId);
+          return { [p.userId]: odds };
+        } catch (error) {
+          console.error('Error calculando odds:', error);
+          return { [p.userId]: { odds: 1.0, payoutMultiplier: 1.0 } };
+        }
       });
       const oddsResults = await Promise.all(oddsPromises);
       const oddsMap = Object.assign({}, ...oddsResults);
       setOddsData(oddsMap);
     } catch (error) {
       console.error('Error cargando datos:', error);
+      alert('Error al cargar los datos del evento. Por favor, recarga la página.');
     } finally {
       setLoading(false);
     }
