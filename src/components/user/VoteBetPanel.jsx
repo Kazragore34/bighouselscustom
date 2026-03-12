@@ -12,7 +12,7 @@ import './VoteBetPanel.css';
 
 const VoteBetPanel = () => {
   const { eventId } = useParams();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [participants, setParticipants] = useState([]);
   const [voteCounts, setVoteCounts] = useState({});
   const [oddsData, setOddsData] = useState({});
@@ -24,7 +24,10 @@ const VoteBetPanel = () => {
 
   useEffect(() => {
     if (user && user.id && eventId) {
-      loadData();
+      // Refrescar usuario antes de cargar datos para asegurar datos actualizados
+      refreshUser().then(() => {
+        loadData();
+      });
     }
   }, [eventId, user?.id]);
 

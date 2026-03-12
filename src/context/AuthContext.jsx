@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { login as loginService, loginWithGoogle } from '../services/auth';
+import { getUserById } from '../services/users';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 const AuthContext = createContext(null);
 
@@ -15,12 +18,74 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Función para refrescar los datos del usuario desde Firestore
+  const refreshUser = async () => {
+    if (!user || !user.id) {
+      return;
+    }
+
+    try {
+      let userData = null;
+      
+      // Intentar obtener por ID primero
+      try {
+        userData = await getUserById(user.id);
+      } catch (error) {
+        // Si falla por ID, intentar por email o username
+        if (user.email) {
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('email', '==', user.email));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userDataFromDoc = userDoc.data();
+            const { password: _, ...userWithoutPassword } = userDataFromDoc;
+            userData = {
+              id: userDoc.id,
+              ...userWithoutPassword
+            };
+          }
+        } else if (user.username) {
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('username', '==', user.username));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userDataFromDoc = userDoc.data();
+            const { password: _, ...userWithoutPassword } = userDataFromDoc;
+            userData = {
+              id: userDoc.id,
+              ...userWithoutPassword
+            };
+          }
+        }
+      }
+
+      if (userData) {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        console.log('Usuario refrescado desde Firestore:', userData);
+      }
+    } catch (error) {
+      console.error('Error refrescando usuario:', error);
+    }
+  };
+
   useEffect(() => {
     // Verificar si hay usuario en localStorage
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        
+        // Refrescar datos desde Firestore después de cargar desde localStorage
+        // Esto asegura que tenemos los datos más recientes
+        setTimeout(() => {
+          refreshUser();
+        }, 500);
       } catch (error) {
         localStorage.removeItem('user');
       }
@@ -64,6 +129,7 @@ export const AuthProvider = ({ children }) => {
     login,
     loginGoogle,
     logout,
+    refreshUser,
     isAdmin: isAdmin(),
     loading
   };
