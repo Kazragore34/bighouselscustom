@@ -1,4 +1,4 @@
-# Sistema de Apuestas - Big House
+# Los Santos Custom - Sistema de Apuestas
 
 Sistema completo de apuestas por favoritos con panel de administración y panel de usuario, construido con React y Firebase.
 

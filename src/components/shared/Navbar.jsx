@@ -16,7 +16,10 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-content">
         <div className="navbar-brand" onClick={() => navigate('/dashboard')}>
-          <h2>🎲 Big House</h2>
+          <div className="navbar-logo">
+            <span className="gta-logo-small">⭐</span>
+            <h2>Los Santos Custom</h2>
+          </div>
         </div>
 
         <div className="navbar-menu">

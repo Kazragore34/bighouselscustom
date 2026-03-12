@@ -73,7 +73,10 @@ const SignUp = () => {
     <div className="signup-container">
       <div className="signup-card">
         <div className="signup-header">
-          <h1>🎲 Big House</h1>
+          <div className="logo-container">
+            <div className="gta-logo">⭐</div>
+            <h1>Los Santos Custom</h1>
+          </div>
           <p>Crear Cuenta</p>
         </div>
         

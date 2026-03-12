@@ -45,7 +45,10 @@ const Login = () => {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1>🎲 Big House</h1>
+          <div className="logo-container">
+            <div className="gta-logo">⭐</div>
+            <h1>Los Santos Custom</h1>
+          </div>
           <p>Sistema de Apuestas</p>
         </div>
         
