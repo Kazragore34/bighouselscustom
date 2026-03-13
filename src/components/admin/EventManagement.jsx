@@ -423,7 +423,6 @@ const EventManagement = () => {
                     Lista Cerrada
                   </span>
                 )}
-                )}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
