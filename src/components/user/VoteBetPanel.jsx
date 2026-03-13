@@ -78,7 +78,7 @@ const VoteBetPanel = () => {
         const event = await getEventById(eventId);
         const bracketType = event.bracketType || '1v1';
         const participantsPerBracket = event.participantsPerBracket || 2;
-        const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
+        const preview = await generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket, eventId);
         setPreviewBrackets(preview);
       }
     } catch (error) {
@@ -132,7 +132,7 @@ const VoteBetPanel = () => {
           // Esto evita regenerar constantemente cuando loadData() se ejecuta múltiples veces
           const bracketType = event.bracketType || '1v1';
           const participantsPerBracket = event.participantsPerBracket || 2;
-          const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
+          const preview = await generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket, eventId);
           setPreviewBrackets(preview);
           bracketsGeneratedRef.current = true; // Marcar como generado
         }
@@ -142,7 +142,7 @@ const VoteBetPanel = () => {
         if (participantsWithData.length > 0 && event && !bracketsGeneratedRef.current) {
           const bracketType = event.bracketType || '1v1';
           const participantsPerBracket = event.participantsPerBracket || 2;
-          const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
+          const preview = await generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket, eventId);
           setPreviewBrackets(preview);
           bracketsGeneratedRef.current = true; // Marcar como generado
         }

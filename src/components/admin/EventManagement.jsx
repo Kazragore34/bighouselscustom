@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getAllEvents, createEvent, updateEvent, deleteEvent, getEventParticipants, addParticipantsToEvent } from '../../services/events';
+import { getAllEvents, createEvent, updateEvent, deleteEvent, getEventParticipants, addParticipantsToEvent, closeParticipantsList, getEventById } from '../../services/events';
+import { generateSmartBrackets } from '../../services/brackets';
 import { getAllUsers, getUserById } from '../../services/users';
 import { fileToBase64 } from '../../utils/imageUtils';
 import { Plus, Edit, Trash2, Upload, Users, UserPlus, X, Trophy } from 'lucide-react';
@@ -370,9 +371,57 @@ const EventManagement = () => {
                     className="btn-winner"
                     title="Establecer ganador final"
                   >
-                    <Trophy size={16} />
-                    Ganador
+                  <Trophy size={16} />
+                  Ganador
+                </button>
+                {!event.participantsListClosed && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      if (!confirm('¿Cerrar lista de participantes y generar bracket final? Esto creará el bracket oficial basado en votos y apuestas actuales. Ya no se podrán agregar más participantes.')) {
+                        return;
+                      }
+                      try {
+                        // Cerrar lista
+                        await closeParticipantsList(event.id);
+                        
+                        // Obtener participantes y generar bracket final
+                        const participants = await getEventParticipants(event.id);
+                        const participantsWithData = await Promise.all(
+                          participants.map(async (p) => {
+                            try {
+                              const userData = await getUserById(p.userId);
+                              return { ...p, ...userData };
+                            } catch (err) {
+                              return { ...p, username: p.userId };
+                            }
+                          })
+                        );
+                        
+                        const bracketType = event.bracketType || '1v1';
+                        const participantsPerBracket = event.participantsPerBracket || 2;
+                        
+                        await generateSmartBrackets(event.id, participantsWithData, bracketType, participantsPerBracket);
+                        alert('Lista cerrada y bracket final generado exitosamente');
+                        loadData();
+                      } catch (error) {
+                        console.error('Error cerrando lista:', error);
+                        alert('Error: ' + error.message);
+                      }
+                    }}
+                    className="btn-close-list"
+                    title="Cerrar lista de participantes y generar bracket final"
+                  >
+                    <X size={16} />
+                    Cerrar Lista
                   </button>
+                )}
+                {event.participantsListClosed && (
+                  <span className="badge badge-closed" title="Lista de participantes cerrada">
+                    Lista Cerrada
+                  </span>
+                )}
                 )}
                 <button 
                   onClick={(e) => {

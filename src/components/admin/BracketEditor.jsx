@@ -63,6 +63,12 @@ const BracketEditor = () => {
   };
 
   const handleGenerateBrackets = async () => {
+    // Solo permitir generar si la lista está cerrada o si no hay brackets oficiales
+    if (event?.participantsListClosed) {
+      alert('La lista de participantes ya está cerrada. Usa el botón "Cerrar Lista" en la gestión de eventos para regenerar el bracket final.');
+      return;
+    }
+    
     if (!confirm('¿Generar brackets automáticamente? Esto reemplazará los brackets existentes.')) {
       return;
     }

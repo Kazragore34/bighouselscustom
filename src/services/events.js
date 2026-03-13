@@ -96,6 +96,20 @@ export const getEventById = async (eventId) => {
   }
 };
 
+// Cerrar lista de participantes y generar bracket final
+export const closeParticipantsList = async (eventId) => {
+  try {
+    const eventRef = doc(db, 'events', eventId);
+    await updateDoc(eventRef, {
+      participantsListClosed: true,
+      participantsListClosedAt: serverTimestamp()
+    });
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Actualizar evento
 export const updateEvent = async (eventId, updates) => {
   try {

@@ -63,7 +63,7 @@ const BracketViewer = () => {
           const participantsPerBracket = event.participantsPerBracket || 2;
           
           // Generar preview de brackets SOLO con participantes de este evento
-          bracketsData = generatePreviewBrackets(eventParticipants, bracketType, participantsPerBracket);
+          bracketsData = await generatePreviewBrackets(eventParticipants, bracketType, participantsPerBracket, eventId);
           setIsPreview(true);
         }
       }
