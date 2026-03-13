@@ -230,6 +230,39 @@ export const addTeamToEvent = async (eventId, teamId) => {
   }
 };
 
+// Eliminar participantes de un evento
+export const removeParticipantsFromEvent = async (eventId, userIds) => {
+  try {
+    if (!userIds || userIds.length === 0) {
+      return true;
+    }
+
+    const participantsRef = collection(db, 'eventParticipants');
+    const userIdsSet = new Set(userIds);
+    
+    // Firestore limita 'in' a 10 elementos, así que obtenemos todos los participantes del evento
+    // y filtramos en memoria
+    const q = query(
+      participantsRef,
+      where('eventId', '==', eventId)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    // Filtrar solo los que están en la lista de eliminación
+    const docsToDelete = querySnapshot.docs.filter(doc => {
+      const data = doc.data();
+      return userIdsSet.has(data.userId);
+    });
+    
+    const deletePromises = docsToDelete.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
 // Obtener participantes de un evento
 export const getEventParticipants = async (eventId) => {
   try {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { getAvailableTeamsForEvent } from '../../services/teams';
-import { addParticipantsToEvent, addTeamToEvent, getEventParticipants } from '../../services/events';
+import { addParticipantsToEvent, addTeamToEvent, getEventParticipants, removeParticipantsFromEvent } from '../../services/events';
 import { getAllUsers, getUserById } from '../../services/users';
 import { Search, Users, X, Plus, Trash2 } from 'lucide-react';
 import './ParticipantsModal.css';
@@ -12,6 +12,7 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
   const [availableTeams, setAvailableTeams] = useState([]);
   const [eventParticipants, setEventParticipants] = useState([]);
   const [teams, setTeams] = useState([]); // Equipos creados en este modal
+  const [selectedUserIds, setSelectedUserIds] = useState(new Set()); // Para eventos individuales
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -45,6 +46,12 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
           : { ...p, username: 'Usuario no encontrado' };
       });
       setEventParticipants(participantsWithData);
+
+      // Para eventos individuales, inicializar checkboxes con participantes existentes
+      if (!isTeamEvent) {
+        const existingParticipantIds = new Set(participantsData.map(p => p.userId));
+        setSelectedUserIds(existingParticipantIds);
+      }
 
       // Si es evento por equipos
       if (isTeamEvent) {
@@ -217,8 +224,26 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
           await addParticipantsToEvent(event.id, participantsToAdd);
         }
       } else {
-        // Evento individual - agregar participantes seleccionados manualmente
-        // Esto se manejará con checkboxes tradicionales
+        // Evento individual - guardar participantes seleccionados con checkboxes
+        const currentParticipantIds = new Set(eventParticipants.map(p => p.userId));
+        const selectedIds = Array.from(selectedUserIds);
+        
+        // Identificar participantes a agregar (están seleccionados pero no están en el evento)
+        const toAdd = selectedIds.filter(userId => !currentParticipantIds.has(userId));
+        
+        // Identificar participantes a eliminar (están en el evento pero no están seleccionados)
+        const toRemove = Array.from(currentParticipantIds).filter(userId => !selectedUserIds.has(userId));
+        
+        // Agregar nuevos participantes
+        if (toAdd.length > 0) {
+          const newParticipants = toAdd.map(userId => ({ userId }));
+          await addParticipantsToEvent(event.id, newParticipants);
+        }
+        
+        // Eliminar participantes deseleccionados
+        if (toRemove.length > 0) {
+          await removeParticipantsFromEvent(event.id, toRemove);
+        }
       }
 
       alert('Participantes guardados exitosamente');
@@ -435,7 +460,19 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
                   <div className="users-list-checkbox">
                     {filteredUsers.map(user => (
                       <label key={user.id} className="checkbox-label">
-                        <input type="checkbox" />
+                        <input 
+                          type="checkbox" 
+                          checked={selectedUserIds.has(user.id)}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedUserIds);
+                            if (e.target.checked) {
+                              newSelected.add(user.id);
+                            } else {
+                              newSelected.delete(user.id);
+                            }
+                            setSelectedUserIds(newSelected);
+                          }}
+                        />
                         {user.username}
                       </label>
                     ))}
