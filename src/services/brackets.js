@@ -71,9 +71,27 @@ export const updateBracket = async (bracketId, updates) => {
 // Generar brackets inteligentes con múltiples rondas
 export const generateSmartBrackets = async (eventId, participants, bracketType, participantsPerBracket) => {
   try {
+    console.log('generateSmartBrackets iniciado:', { eventId, participantsCount: participants.length, bracketType, participantsPerBracket });
+    
+    // Validar que hay participantes
+    if (!participants || participants.length === 0) {
+      throw new Error('No hay participantes para generar brackets');
+    }
+    
     // Obtener votos y apuestas para detectar favoritos
-    const votes = await getVotesByEvent(eventId);
-    const bets = await getBetsByEvent(eventId);
+    console.log('Obteniendo votos y apuestas...');
+    const [votes, bets] = await Promise.all([
+      getVotesByEvent(eventId).catch(err => {
+        console.warn('Error obteniendo votos, usando array vacío:', err);
+        return [];
+      }),
+      getBetsByEvent(eventId).catch(err => {
+        console.warn('Error obteniendo apuestas, usando array vacío:', err);
+        return [];
+      })
+    ]);
+    
+    console.log('Votos obtenidos:', votes.length, 'Apuestas obtenidas:', bets.length);
 
     // Calcular score de favoritos (combinación de votos y apuestas)
     const favoriteScores = {};
@@ -113,7 +131,31 @@ export const generateSmartBrackets = async (eventId, participants, bracketType, 
       shuffledRest
     );
 
+    // Validar que se generaron rondas
+    if (!allRounds || allRounds.length === 0) {
+      throw new Error('No se pudieron generar rondas para los brackets');
+    }
+    
+    console.log('Rondas generadas:', allRounds.length);
+    
+    // Eliminar brackets existentes antes de crear nuevos
+    console.log('Eliminando brackets existentes...');
+    try {
+      const existingBrackets = await getBracketsByEvent(eventId);
+      const deletePromises = existingBrackets.map(bracket => {
+        const bracketRef = doc(db, 'brackets', bracket.id);
+        return deleteDoc(bracketRef).catch(err => {
+          console.warn('Error eliminando bracket existente:', bracket.id, err);
+        });
+      });
+      await Promise.all(deletePromises);
+      console.log('Brackets existentes eliminados');
+    } catch (deleteError) {
+      console.warn('Error eliminando brackets existentes, continuando:', deleteError);
+    }
+    
     // Guardar cada ronda en Firestore
+    console.log('Guardando brackets en Firestore...');
     const bracketIds = [];
     for (let i = 0; i < allRounds.length; i++) {
       const roundData = {
@@ -122,12 +164,17 @@ export const generateSmartBrackets = async (eventId, participants, bracketType, 
         matches: allRounds[i],
         isFinal: i === allRounds.length - 1
       };
+      console.log(`Guardando ronda ${i + 1}/${allRounds.length}...`);
       const bracketId = await createBracket(roundData);
       bracketIds.push(bracketId);
+      console.log(`Ronda ${i + 1} guardada con ID:`, bracketId);
     }
 
+    console.log('Brackets generados exitosamente, IDs:', bracketIds);
     return bracketIds[0]; // Retornar ID de la primera ronda
   } catch (error) {
+    console.error('Error completo en generateSmartBrackets:', error);
+    console.error('Stack:', error.stack);
     throw error;
   }
 };

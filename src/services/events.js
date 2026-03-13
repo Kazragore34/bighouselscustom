@@ -313,31 +313,24 @@ export const getEventParticipants = async (eventId) => {
     console.log('getEventParticipants llamado con eventId:', eventId);
     const participantsRef = collection(db, 'eventParticipants');
     
-    // Primero intentar con enabled == true
-    let q = query(
+    // NO usar múltiples where para evitar necesidad de índice compuesto
+    // Obtener todos los participantes del evento y filtrar en memoria
+    const q = query(
       participantsRef,
-      where('eventId', '==', eventId),
-      where('enabled', '==', true)
+      where('eventId', '==', eventId)
     );
     
-    let querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(q);
     let participants = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
     
-    // Si no hay resultados, intentar sin el filtro de enabled (por si algunos documentos no tienen ese campo)
-    if (participants.length === 0) {
-      console.log('No se encontraron participantes con enabled=true, buscando sin filtro...');
-      q = query(
-        participantsRef,
-        where('eventId', '==', eventId)
-      );
-      querySnapshot = await getDocs(q);
-      participants = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    // Filtrar en memoria solo los que tienen enabled == true (o no tienen el campo)
+    // Si no hay ninguno con enabled, usar todos
+    const enabledParticipants = participants.filter(p => p.enabled !== false);
+    if (enabledParticipants.length > 0) {
+      participants = enabledParticipants;
     }
     
     console.log('Participantes encontrados:', participants.length, participants);

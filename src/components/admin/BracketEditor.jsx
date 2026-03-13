@@ -68,15 +68,26 @@ const BracketEditor = () => {
     }
 
     try {
+      setLoading(true);
+      console.log('Generando brackets para evento:', eventId);
+      console.log('Participantes:', participants);
+      
       // Obtener el tipo de bracket del evento
       const bracketType = event?.bracketType || '1v1';
       const participantsPerBracket = event?.participantsPerBracket || 2;
       
+      console.log('Tipo de bracket:', bracketType, 'Participantes por bracket:', participantsPerBracket);
+      
       await generateSmartBrackets(eventId, participants, bracketType, participantsPerBracket);
+      console.log('Brackets generados exitosamente');
       alert('Brackets generados exitosamente');
-      loadData();
+      await loadData();
     } catch (error) {
+      console.error('Error completo al generar brackets:', error);
+      console.error('Stack:', error.stack);
       alert('Error al generar brackets: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
