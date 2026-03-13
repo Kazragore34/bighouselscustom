@@ -61,17 +61,24 @@ export const getAllEvents = async () => {
 export const getActiveEvents = async () => {
   try {
     const eventsRef = collection(db, 'events');
+    // Solo filtrar por status, ordenar en memoria para evitar necesidad de índice compuesto
     const q = query(
       eventsRef,
-      where('status', '==', 'active'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'active')
     );
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({
+    const events = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    // Ordenar en memoria por createdAt descendente
+    return events.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || 0;
+      const bTime = b.createdAt?.toMillis?.() || 0;
+      return bTime - aTime; // Descendente
+    });
   } catch (error) {
     throw error;
   }
