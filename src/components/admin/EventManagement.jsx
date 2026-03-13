@@ -324,11 +324,9 @@ const EventManagement = () => {
                 <span className="badge badge-type">{event.eventType}</span>
                 <span className="badge badge-status">{event.status}</span>
                 <span className="badge badge-commission">Comisión: {event.houseCommission}%</span>
-                {eventTotals[event.id] && (
-                  <span className="badge badge-pot" title={`Bote total: $${eventTotals[event.id].totalBets.toFixed(2)} | ${eventTotals[event.id].confirmedBetsCount} apuestas confirmadas | ${eventTotals[event.id].pendingBetsCount} pendientes`}>
-                    💰 Bote: ${eventTotals[event.id].totalBets.toFixed(2)}
-                  </span>
-                )}
+                <span className="badge badge-pot" title={eventTotals[event.id] ? `Bote total: $${eventTotals[event.id].totalBets.toFixed(2)} | ${eventTotals[event.id].confirmedBetsCount} apuestas confirmadas | ${eventTotals[event.id].pendingBetsCount} pendientes` : 'Cargando bote...'}>
+                  💰 Bote: ${eventTotals[event.id] ? eventTotals[event.id].totalBets.toFixed(2) : '0.00'}
+                </span>
               </div>
               <div className="event-actions" onClick={(e) => e.stopPropagation()}>
                 <button 
