@@ -114,15 +114,18 @@ const VoteBetPanel = () => {
 
       setParticipants(participantsWithData);
 
-      // Cargar brackets oficiales primero, si no hay, generar preview
+      // Cargar brackets oficiales primero, si no hay, generar preview SOLO UNA VEZ
+      // NO regenerar brackets si ya existen (evita cambios constantes)
       try {
         const officialBrackets = await getBracketsByEvent(eventId);
-        if (officialBrackets.length > 0) {
-          // Filtrar solo brackets del evento actual
-          const filteredBrackets = officialBrackets.filter(b => b.eventId === eventId);
+        const filteredBrackets = officialBrackets.filter(b => b.eventId === eventId);
+        
+        if (filteredBrackets.length > 0) {
+          // Hay brackets oficiales, usarlos siempre
           setPreviewBrackets(filteredBrackets);
-        } else if (participantsWithData.length > 0 && event) {
-          // Solo generar preview si no hay brackets oficiales
+        } else if (participantsWithData.length > 0 && event && previewBrackets.length === 0) {
+          // Solo generar preview si NO hay brackets oficiales Y NO hay preview ya generado
+          // Esto evita regenerar constantemente cuando loadData() se ejecuta múltiples veces
           const bracketType = event.bracketType || '1v1';
           const participantsPerBracket = event.participantsPerBracket || 2;
           const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
@@ -130,8 +133,8 @@ const VoteBetPanel = () => {
         }
       } catch (error) {
         console.error('Error cargando brackets:', error);
-        // Si hay error, generar preview como fallback
-        if (participantsWithData.length > 0 && event) {
+        // Si hay error y no hay preview, generar como fallback SOLO UNA VEZ
+        if (participantsWithData.length > 0 && event && previewBrackets.length === 0) {
           const bracketType = event.bracketType || '1v1';
           const participantsPerBracket = event.participantsPerBracket || 2;
           const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
