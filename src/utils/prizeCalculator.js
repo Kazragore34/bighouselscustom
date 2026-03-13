@@ -29,11 +29,26 @@ export const calculateOdds = async (eventId, participantId) => {
     }
 
     // Calcular votos del participante
+    // IMPORTANTE: Asegurar que todos los participantes tengan al menos 1 voto invisible
+    // para que los odds se calculen correctamente incluso con 0 votos reales
     const participantVotes = votes.filter(vote => vote.favoriteId === participantId).length;
-    const totalVotes = votes.length;
-
+    
+    // Obtener todos los participantes del evento para asegurar que todos tengan mínimo 1 voto
+    const { getEventParticipants } = await import('../services/events');
+    const eventParticipants = await getEventParticipants(eventId);
+    const totalParticipants = eventParticipants.length;
+    
+    // Total de votos = votos reales + 1 voto invisible por cada participante sin votos
+    // Esto asegura que todos los participantes cuenten para el cálculo de odds
+    const participantsWithVotes = new Set(votes.map(v => v.favoriteId));
+    const participantsWithoutVotes = totalParticipants - participantsWithVotes.size;
+    const totalVotes = votes.length + participantsWithoutVotes; // Votos reales + votos invisibles
+    
+    // Votos del participante: votos reales + 1 voto invisible si no tiene votos reales
+    const effectiveParticipantVotes = participantVotes > 0 ? participantVotes : 1;
+    
     // Calcular ratio de votos (peso principal: 75%)
-    const voteRatio = totalVotes > 0 ? participantVotes / totalVotes : 0.5;
+    const voteRatio = totalVotes > 0 ? effectiveParticipantVotes / totalVotes : 1 / totalParticipants;
 
     // Calcular ratio de dinero apostado (peso secundario: 25%)
     const betRatio = participantBetAmount / totalBetAmount;

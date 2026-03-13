@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { getAvailableTeamsForEvent } from '../../services/teams';
 import { addParticipantsToEvent, addTeamToEvent, getEventParticipants } from '../../services/events';
@@ -23,47 +23,38 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
   const loadData = async () => {
     try {
       setLoading(true);
+      const isTeamEvent = event.bracketType === '2v2' || event.bracketType === 'custom';
+      const requiredMembers = event.participantsPerBracket || 2;
+
+      // Cargar datos en paralelo
       const [usersData, participantsData] = await Promise.all([
         getAllUsers(),
         getEventParticipants(event.id)
       ]);
 
-      // Filtrar solo usuarios PARTICIPANTE
+      // Filtrar solo usuarios PARTICIPANTE y crear mapa para acceso rápido
       const participantUsers = usersData.filter(u => u.enabled && u.userType === 'PARTICIPANTE');
+      const usersMap = new Map(participantUsers.map(u => [u.id, u]));
       setUsers(participantUsers);
 
-      // Cargar participantes con datos completos
-      const participantsWithData = await Promise.all(
-        participantsData.map(async (p) => {
-          try {
-            const userData = await getUserById(p.userId);
-            return { ...p, ...userData };
-          } catch (err) {
-            return { ...p, username: 'Usuario no encontrado' };
-          }
-        })
-      );
+      // Optimizar: usar el mapa en lugar de hacer llamadas individuales a Firestore
+      const participantsWithData = participantsData.map((p) => {
+        const userData = usersMap.get(p.userId);
+        return userData 
+          ? { ...p, ...userData }
+          : { ...p, username: 'Usuario no encontrado' };
+      });
       setEventParticipants(participantsWithData);
 
-      // Si es evento por equipos, agrupar participantes existentes en equipos
+      // Si es evento por equipos
       if (isTeamEvent) {
-        const existingTeams = groupParticipantsIntoTeams(participantsWithData, requiredMembers);
-        if (existingTeams.length > 0) {
-          setTeams(existingTeams);
-        }
-      }
-
-      // Si es evento por equipos, cargar equipos disponibles
-      if (event.bracketType === '2v2' || event.bracketType === 'custom') {
-        const requiredMembers = event.participantsPerBracket || 2;
-        const teamsData = await getAvailableTeamsForEvent(requiredMembers);
+        // Cargar equipos disponibles en paralelo
+        const [teamsData, existingTeams] = await Promise.all([
+          getAvailableTeamsForEvent(requiredMembers),
+          Promise.resolve(groupParticipantsIntoTeams(participantsWithData, requiredMembers))
+        ]);
+        
         setAvailableTeams(teamsData);
-      }
-
-      // Inicializar equipos vacíos si es por equipos
-      if (event.bracketType === '2v2' || event.bracketType === 'custom') {
-        const requiredMembers = event.participantsPerBracket || 2;
-        const existingTeams = groupParticipantsIntoTeams(participantsWithData, requiredMembers);
         setTeams(existingTeams.length > 0 ? existingTeams : [{ id: 'team-1', name: 'Equipo 1', members: [] }]);
       }
     } catch (error) {
@@ -94,18 +85,29 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
     return teams;
   };
 
-  // Filtrar usuarios que ya están en equipos o asignados
-  const assignedUserIds = new Set();
-  teams.forEach(team => {
-    team.members.forEach(userId => assignedUserIds.add(userId));
-  });
-  eventParticipants.forEach(p => assignedUserIds.add(p.userId));
+  // Memoizar cálculos pesados para evitar recalcular en cada render
+  const assignedUserIds = useMemo(() => {
+    const assigned = new Set();
+    teams.forEach(team => {
+      team.members.forEach(userId => assigned.add(userId));
+    });
+    eventParticipants.forEach(p => assigned.add(p.userId));
+    return assigned;
+  }, [teams, eventParticipants]);
 
-  const filteredUsers = users.filter(u =>
-    !assignedUserIds.has(u.id) &&
-    (u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     u.name?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredUsers = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase();
+    return users.filter(u =>
+      !assignedUserIds.has(u.id) &&
+      (u.username?.toLowerCase().includes(searchLower) ||
+       u.name?.toLowerCase().includes(searchLower))
+    );
+  }, [users, assignedUserIds, searchTerm]);
+
+  // Memoizar mapa de usuarios para acceso rápido
+  const usersMap = useMemo(() => {
+    return new Map(users.map(u => [u.id, u]));
+  }, [users]);
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
@@ -270,7 +272,7 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
                         <h4>{team.name}</h4>
                         <div className="team-members-preview">
                           {team.members.slice(0, 3).map(memberId => {
-                            const member = users.find(u => u.id === memberId);
+                            const member = usersMap.get(memberId);
                             return (
                               <span key={memberId} className="member-tag">
                                 {member?.username || memberId}
@@ -327,7 +329,7 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
                             </div>
                             <div className="team-members-drop">
                               {team.members.map((userId, index) => {
-                                const user = users.find(u => u.id === userId);
+                                const user = usersMap.get(userId);
                                 return (
                                   <Draggable key={userId} draggableId={userId} index={index}>
                                     {(provided, snapshot) => (
