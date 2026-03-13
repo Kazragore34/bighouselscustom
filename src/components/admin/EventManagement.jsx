@@ -59,17 +59,19 @@ const EventManagement = () => {
         try {
           const bets = await getBetsByEvent(event.id);
           const confirmedBets = bets.filter(b => b.status === 'confirmed');
-          const totalBets = confirmedBets.reduce((sum, bet) => sum + bet.amount, 0);
+          const totalBets = confirmedBets.reduce((sum, bet) => sum + (bet.amount || 0), 0);
           totals[event.id] = {
             totalBets,
             confirmedBetsCount: confirmedBets.length,
             pendingBetsCount: bets.filter(b => b.status === 'pending').length
           };
+          console.log(`Evento ${event.name} (${event.id}): Bote total = $${totalBets.toFixed(2)}, ${confirmedBets.length} apuestas confirmadas`);
         } catch (error) {
           console.error(`Error cargando apuestas para evento ${event.id}:`, error);
           totals[event.id] = { totalBets: 0, confirmedBetsCount: 0, pendingBetsCount: 0 };
         }
       }
+      console.log('Totales de botes cargados:', totals);
       setEventTotals(totals);
     } catch (error) {
       console.error('Error cargando datos:', error);
