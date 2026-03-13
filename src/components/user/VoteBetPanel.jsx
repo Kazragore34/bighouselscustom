@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getEventParticipants, getEventById } from '../../services/events';
 import { getBracketsByEvent } from '../../services/brackets';
@@ -30,9 +30,12 @@ const VoteBetPanel = () => {
   const [eventData, setEventData] = useState(null); // Datos del evento para validar fecha límite
   const [previewBrackets, setPreviewBrackets] = useState([]); // Preview de brackets basado en participantes actuales
   const [showBetsModal, setShowBetsModal] = useState(false); // Modal de apuestas
+  const bracketsGeneratedRef = useRef(false); // Flag para evitar regenerar brackets constantemente
 
   useEffect(() => {
     if (user && user.id && eventId) {
+      // Resetear flag cuando cambia el evento
+      bracketsGeneratedRef.current = false;
       // Refrescar usuario antes de cargar datos para asegurar datos actualizados
       refreshUser().then(() => {
         loadData();
@@ -43,9 +46,9 @@ const VoteBetPanel = () => {
     // Solo se actualizará cuando cambien los participantes del evento
     // Esto evita que los brackets cambien constantemente
     
-    // Cleanup: no hacer nada al desmontar
+    // Cleanup: resetear flag al cambiar de evento
     return () => {
-      // No hay intervalos que limpiar
+      bracketsGeneratedRef.current = false;
     };
   }, [eventId, user?.id]);
 
@@ -121,24 +124,27 @@ const VoteBetPanel = () => {
         const filteredBrackets = officialBrackets.filter(b => b.eventId === eventId);
         
         if (filteredBrackets.length > 0) {
-          // Hay brackets oficiales, usarlos siempre
+          // Hay brackets oficiales, usarlos siempre (se actualizan si cambian en Firestore)
           setPreviewBrackets(filteredBrackets);
-        } else if (participantsWithData.length > 0 && event && previewBrackets.length === 0) {
-          // Solo generar preview si NO hay brackets oficiales Y NO hay preview ya generado
+          bracketsGeneratedRef.current = true; // Marcar como procesado
+        } else if (participantsWithData.length > 0 && event && !bracketsGeneratedRef.current) {
+          // Solo generar preview si NO hay brackets oficiales Y NO se ha generado ya
           // Esto evita regenerar constantemente cuando loadData() se ejecuta múltiples veces
           const bracketType = event.bracketType || '1v1';
           const participantsPerBracket = event.participantsPerBracket || 2;
           const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
           setPreviewBrackets(preview);
+          bracketsGeneratedRef.current = true; // Marcar como generado
         }
       } catch (error) {
         console.error('Error cargando brackets:', error);
-        // Si hay error y no hay preview, generar como fallback SOLO UNA VEZ
-        if (participantsWithData.length > 0 && event && previewBrackets.length === 0) {
+        // Si hay error y no se ha generado ya, generar como fallback SOLO UNA VEZ
+        if (participantsWithData.length > 0 && event && !bracketsGeneratedRef.current) {
           const bracketType = event.bracketType || '1v1';
           const participantsPerBracket = event.participantsPerBracket || 2;
           const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
           setPreviewBrackets(preview);
+          bracketsGeneratedRef.current = true; // Marcar como generado
         }
       }
 
