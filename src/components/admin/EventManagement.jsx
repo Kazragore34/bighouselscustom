@@ -371,9 +371,10 @@ const EventManagement = () => {
                     className="btn-winner"
                     title="Establecer ganador final"
                   >
-                  <Trophy size={16} />
-                  Ganador
-                </button>
+                    <Trophy size={16} />
+                    Ganador
+                  </button>
+                )}
                 {!event.participantsListClosed && (
                   <button
                     onClick={async (e) => {
