@@ -96,13 +96,35 @@ const BetConfirmation = () => {
 
   return (
     <div className="bet-confirmation">
-      <div className="page-header">
+      <div className="bet-confirmation-header">
         <h1>Confirmación de Apuestas</h1>
-        <div className="header-info">
-          <Clock size={20} />
-          <span>{pendingBets.length} apuestas pendientes</span>
+        <div className="header-stats">
+          <div className="stat-item">
+            <Clock size={20} />
+            <span>{pendingBets.length} apuestas pendientes</span>
+          </div>
+          <div className="stat-item pot-total">
+            <TrendingUp size={20} />
+            <span>Bote Total: ${totalPot.toFixed(2)}</span>
+          </div>
         </div>
       </div>
+
+      {/* Resumen de botes por evento */}
+      {Object.keys(eventPots).length > 0 && (
+        <div className="event-pots-summary">
+          <h2>Botes por Evento</h2>
+          <div className="pots-grid">
+            {Object.entries(eventPots).map(([eventId, pot]) => (
+              <div key={eventId} className="pot-card">
+                <h3>{pot.eventName}</h3>
+                <div className="pot-amount">${pot.total.toFixed(2)}</div>
+                <div className="pot-count">{pot.count} apuestas confirmadas</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {pendingBets.length === 0 ? (
         <div className="no-bets">
