@@ -180,24 +180,44 @@ export const deleteEvent = async (eventId) => {
 // Agregar participantes a evento (individuales o por equipos)
 export const addParticipantsToEvent = async (eventId, participants) => {
   try {
+    console.log('addParticipantsToEvent llamado con:', { eventId, participants });
+    
+    if (!eventId || !participants || participants.length === 0) {
+      console.warn('Datos inválidos para agregar participantes');
+      return true;
+    }
+
     // participants puede ser array de userIds o array de objetos {userId, teamId}
     const participantsArray = Array.isArray(participants) && participants.length > 0 && typeof participants[0] === 'string'
       ? participants.map(userId => ({ userId }))
       : participants;
 
+    console.log('Participantes procesados:', participantsArray);
+
     const writePromises = participantsArray.map(async (participant) => {
+      if (!participant.userId) {
+        console.warn('Participante sin userId:', participant);
+        return;
+      }
+      
       const participantRef = doc(collection(db, 'eventParticipants'));
-      await setDoc(participantRef, {
+      const data = {
         eventId,
-        userId: participant.userId || null,
+        userId: participant.userId,
         teamId: participant.teamId || null,
         enabled: true
-      });
+      };
+      
+      console.log('Guardando participante:', data);
+      await setDoc(participantRef, data);
+      console.log('Participante guardado exitosamente:', participant.userId);
     });
 
     await Promise.all(writePromises);
+    console.log('Todos los participantes guardados exitosamente');
     return true;
   } catch (error) {
+    console.error('Error en addParticipantsToEvent:', error);
     throw error;
   }
 };
@@ -266,6 +286,7 @@ export const removeParticipantsFromEvent = async (eventId, userIds) => {
 // Obtener participantes de un evento
 export const getEventParticipants = async (eventId) => {
   try {
+    console.log('getEventParticipants llamado con eventId:', eventId);
     const participantsRef = collection(db, 'eventParticipants');
     const q = query(
       participantsRef,
@@ -274,11 +295,15 @@ export const getEventParticipants = async (eventId) => {
     );
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({
+    const participants = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    console.log('Participantes encontrados:', participants.length, participants);
+    return participants;
   } catch (error) {
+    console.error('Error en getEventParticipants:', error);
     throw error;
   }
 };

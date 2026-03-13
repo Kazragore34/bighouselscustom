@@ -247,13 +247,32 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
         
         // Agregar nuevos participantes
         if (toAdd.length > 0) {
+          console.log('Agregando participantes:', toAdd);
           const newParticipants = toAdd.map(userId => ({ userId }));
-          await addParticipantsToEvent(event.id, newParticipants);
+          try {
+            await addParticipantsToEvent(event.id, newParticipants);
+            console.log('Participantes agregados exitosamente');
+          } catch (error) {
+            console.error('Error agregando participantes:', error);
+            throw error;
+          }
         }
         
         // Eliminar participantes deseleccionados
         if (toRemove.length > 0) {
-          await removeParticipantsFromEvent(event.id, toRemove);
+          console.log('Eliminando participantes:', toRemove);
+          try {
+            await removeParticipantsFromEvent(event.id, toRemove);
+            console.log('Participantes eliminados exitosamente');
+          } catch (error) {
+            console.error('Error eliminando participantes:', error);
+            throw error;
+          }
+        }
+        
+        // Si no hay cambios, mostrar mensaje
+        if (toAdd.length === 0 && toRemove.length === 0) {
+          console.log('No hay cambios en los participantes');
         }
       }
 
