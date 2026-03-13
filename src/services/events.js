@@ -194,27 +194,51 @@ export const addParticipantsToEvent = async (eventId, participants) => {
 
     console.log('Participantes procesados:', participantsArray);
 
-    const writePromises = participantsArray.map(async (participant) => {
+    const writePromises = participantsArray.map(async (participant, index) => {
       if (!participant.userId) {
         console.warn('Participante sin userId:', participant);
         return;
       }
       
-      const participantRef = doc(collection(db, 'eventParticipants'));
-      const data = {
-        eventId,
-        userId: participant.userId,
-        teamId: participant.teamId || null,
-        enabled: true
-      };
-      
-      console.log('Guardando participante:', data);
-      await setDoc(participantRef, data);
-      console.log('Participante guardado exitosamente:', participant.userId);
+      try {
+        const participantRef = doc(collection(db, 'eventParticipants'));
+        const data = {
+          eventId,
+          userId: participant.userId,
+          teamId: participant.teamId || null,
+          enabled: true
+        };
+        
+        console.log(`[${index + 1}/${participantsArray.length}] Guardando participante:`, data);
+        await setDoc(participantRef, data);
+        console.log(`[${index + 1}/${participantsArray.length}] ✓ Participante guardado exitosamente:`, participant.userId, 'Doc ID:', participantRef.id);
+        
+        // Verificar que se guardó correctamente
+        const verifyDoc = await getDoc(participantRef);
+        if (verifyDoc.exists()) {
+          console.log(`[${index + 1}/${participantsArray.length}] ✓ Verificación: Documento existe en Firestore:`, verifyDoc.data());
+        } else {
+          console.error(`[${index + 1}/${participantsArray.length}] ✗ ERROR: Documento NO existe después de guardar!`);
+        }
+      } catch (error) {
+        console.error(`[${index + 1}/${participantsArray.length}] ✗ ERROR guardando participante ${participant.userId}:`, error);
+        console.error('Detalles del error:', {
+          code: error.code,
+          message: error.message,
+          stack: error.stack
+        });
+        throw error; // Re-lanzar para que se detenga el proceso
+      }
     });
 
     await Promise.all(writePromises);
-    console.log('Todos los participantes guardados exitosamente');
+    console.log('✓ Todos los participantes guardados exitosamente');
+    
+    // Verificación final: intentar leer los participantes recién guardados
+    console.log('Verificando participantes guardados...');
+    const verification = await getEventParticipants(eventId);
+    console.log('Participantes verificados después de guardar:', verification.length, verification);
+    
     return true;
   } catch (error) {
     console.error('Error en addParticipantsToEvent:', error);
@@ -288,22 +312,44 @@ export const getEventParticipants = async (eventId) => {
   try {
     console.log('getEventParticipants llamado con eventId:', eventId);
     const participantsRef = collection(db, 'eventParticipants');
-    const q = query(
+    
+    // Primero intentar con enabled == true
+    let q = query(
       participantsRef,
       where('eventId', '==', eventId),
       where('enabled', '==', true)
     );
-    const querySnapshot = await getDocs(q);
     
-    const participants = querySnapshot.docs.map(doc => ({
+    let querySnapshot = await getDocs(q);
+    let participants = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
     
+    // Si no hay resultados, intentar sin el filtro de enabled (por si algunos documentos no tienen ese campo)
+    if (participants.length === 0) {
+      console.log('No se encontraron participantes con enabled=true, buscando sin filtro...');
+      q = query(
+        participantsRef,
+        where('eventId', '==', eventId)
+      );
+      querySnapshot = await getDocs(q);
+      participants = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    }
+    
     console.log('Participantes encontrados:', participants.length, participants);
+    console.log('Detalles de cada participante:', participants.map(p => ({ id: p.id, eventId: p.eventId, userId: p.userId, enabled: p.enabled })));
     return participants;
   } catch (error) {
     console.error('Error en getEventParticipants:', error);
+    console.error('Detalles del error:', {
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    });
     throw error;
   }
 };
