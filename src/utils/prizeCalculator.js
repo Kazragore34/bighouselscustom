@@ -5,9 +5,12 @@ import { getEventById } from '../services/events';
 // Calcular odds dinámicas para un participante
 export const calculateOdds = async (eventId, participantId) => {
   try {
-    const event = await getEventById(eventId);
-    const votes = await getVotesByEvent(eventId);
-    const bets = await getBetsByEvent(eventId);
+    // Cargar datos en paralelo para mejor rendimiento
+    const [event, votes, bets] = await Promise.all([
+      getEventById(eventId),
+      getVotesByEvent(eventId),
+      getBetsByEvent(eventId)
+    ]);
 
     // Filtrar solo apuestas confirmadas
     const confirmedBets = bets.filter(bet => bet.status === 'confirmed');
