@@ -17,12 +17,9 @@ const BracketViewer = () => {
   useEffect(() => {
     loadBrackets();
     
-    // Actualizar brackets cada 5 segundos para ver ganadores en tiempo real
-    const interval = setInterval(() => {
-      loadBrackets();
-    }, 5000);
-    
-    return () => clearInterval(interval);
+    // NO actualizar automáticamente constantemente
+    // Solo se actualizará cuando el usuario haga clic en "Actualizar" o cuando cambien los participantes
+    // Esto evita que los brackets cambien constantemente y no se puedan ver
   }, [eventId]);
 
   const loadBrackets = async () => {
@@ -36,8 +33,13 @@ const BracketViewer = () => {
         const allBrackets = await getBracketsByEvent(eventId);
         // Filtrar solo brackets del evento actual para asegurar que no haya mezcla
         bracketsData = allBrackets.filter(b => b.eventId === eventId);
-        console.log('Brackets oficiales encontrados:', bracketsData);
-        setIsPreview(false);
+        console.log('Brackets oficiales encontrados:', bracketsData.length, bracketsData);
+        
+        if (bracketsData.length > 0) {
+          setIsPreview(false);
+        } else {
+          setIsPreview(true);
+        }
       } catch (error) {
         console.warn('No hay brackets oficiales, generando preview:', error);
         setIsPreview(true);

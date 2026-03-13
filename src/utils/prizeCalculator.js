@@ -48,10 +48,22 @@ export const calculateOdds = async (eventId, participantId) => {
     const effectiveParticipantVotes = participantVotes > 0 ? participantVotes : 1;
     
     // Calcular ratio de votos (peso principal: 75%)
+    // IMPORTANTE: Si todos tienen la misma apuesta, los votos deben tener MÁS peso
     const voteRatio = totalVotes > 0 ? effectiveParticipantVotes / totalVotes : 1 / totalParticipants;
 
     // Calcular ratio de dinero apostado (peso secundario: 25%)
-    const betRatio = participantBetAmount / totalBetAmount;
+    const betRatio = totalBetAmount > 0 ? participantBetAmount / totalBetAmount : 0;
+    
+    // Si todos tienen la misma apuesta, el betRatio no diferencia, así que aumentamos el peso de los votos
+    // Detectar si todas las apuestas son iguales
+    const allBetAmounts = confirmedBets.map(bet => bet.amount);
+    const uniqueBetAmounts = new Set(allBetAmounts);
+    const allSameBet = uniqueBetAmounts.size === 1 && allBetAmounts.length > 1;
+    
+    // Si todas las apuestas son iguales, dar más peso a los votos (90% votos, 10% dinero)
+    // Si hay diferencias en apuestas, usar la distribución normal (75% votos, 25% dinero)
+    const voteWeight = allSameBet ? 0.90 : 0.75;
+    const betWeight = allSameBet ? 0.10 : 0.25;
 
     // MEDIDAS ANTI-MANIPULACIÓN (Adaptadas para dinero ficticio de juego):
     
@@ -86,9 +98,10 @@ export const calculateOdds = async (eventId, participantId) => {
     // Usamos betRatio directamente pero lo multiplicamos por diversidad y concentración
     const adjustedBetRatio = betRatio * bettorDiversity * concentrationFactor;
 
-    // Fórmula mejorada: VOTOS tienen 75% de peso, DINERO solo 25% (ajustado por diversidad)
-    // En dinero ficticio, protegemos contra manipulación pero permitimos grandes apuestas legítimas
-    const popularityScore = voteRatio * 0.75 + adjustedBetRatio * 0.25;
+    // Fórmula mejorada: VOTOS tienen peso variable según si todas las apuestas son iguales
+    // Si todas las apuestas son iguales: 90% votos, 10% dinero (los votos son más importantes)
+    // Si hay diferencias en apuestas: 75% votos, 25% dinero (ajustado por diversidad)
+    const popularityScore = voteRatio * voteWeight + adjustedBetRatio * betWeight;
     const inversePopularity = 1 - popularityScore;
 
     // Odds base (ajustable)

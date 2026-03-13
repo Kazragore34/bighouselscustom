@@ -39,14 +39,9 @@ const VoteBetPanel = () => {
       });
     }
     
-    // Actualizar brackets cada 5 segundos para ver ganadores en tiempo real
-    const interval = setInterval(() => {
-      if (user && user.id && eventId) {
-        loadBracketsPreview();
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
+    // NO actualizar brackets automáticamente constantemente
+    // Solo se actualizará cuando cambien los participantes del evento
+    // Esto evita que los brackets cambien constantemente
   }, [eventId, user?.id]);
 
   const loadBracketsPreview = async () => {

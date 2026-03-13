@@ -23,11 +23,15 @@ const BracketEditor = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [bracketsData, participantsData, eventData] = await Promise.all([
+      const [allBrackets, participantsData, eventData] = await Promise.all([
         getBracketsByEvent(eventId),
         getEventParticipants(eventId),
         getEventById(eventId)
       ]);
+      
+      // Filtrar solo brackets del evento actual para asegurar que no haya mezcla
+      const bracketsData = allBrackets.filter(b => b.eventId === eventId);
+      console.log('Brackets cargados para admin:', bracketsData.length, bracketsData);
       
       setBrackets(bracketsData);
       setParticipants(participantsData);
@@ -106,6 +110,8 @@ const BracketEditor = () => {
     return <div className="loading">Cargando brackets...</div>;
   }
 
+  // Si no hay brackets oficiales, mostrar opción para generarlos automáticamente
+  const hasOfficialBrackets = brackets.length > 0;
   const currentBracket = brackets[round - 1];
 
   return (
@@ -132,6 +138,13 @@ const BracketEditor = () => {
               <option key={index} value={index + 1}>Ronda {index + 1}</option>
             ))}
           </select>
+        </div>
+      )}
+
+      {!hasOfficialBrackets && (
+        <div className="no-brackets-message">
+          <p>No hay brackets oficiales creados aún.</p>
+          <p>Haz clic en "Generar Automáticamente" para crear brackets basados en votos y apuestas actuales.</p>
         </div>
       )}
 
