@@ -20,6 +20,11 @@ const BracketViewer = () => {
     // NO actualizar automáticamente constantemente
     // Solo se actualizará cuando el usuario haga clic en "Actualizar" o cuando cambien los participantes
     // Esto evita que los brackets cambien constantemente y no se puedan ver
+    
+    // Cleanup: no hay intervalos que limpiar
+    return () => {
+      // No hay intervalos activos
+    };
   }, [eventId]);
 
   const loadBrackets = async () => {

@@ -42,6 +42,11 @@ const VoteBetPanel = () => {
     // NO actualizar brackets automáticamente constantemente
     // Solo se actualizará cuando cambien los participantes del evento
     // Esto evita que los brackets cambien constantemente
+    
+    // Cleanup: no hacer nada al desmontar
+    return () => {
+      // No hay intervalos que limpiar
+    };
   }, [eventId, user?.id]);
 
   const loadBracketsPreview = async () => {
@@ -109,12 +114,29 @@ const VoteBetPanel = () => {
 
       setParticipants(participantsWithData);
 
-      // Generar preview de brackets basado en participantes actuales
-      if (participantsWithData.length > 0 && event) {
-        const bracketType = event.bracketType || '1v1';
-        const participantsPerBracket = event.participantsPerBracket || 2;
-        const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
-        setPreviewBrackets(preview);
+      // Cargar brackets oficiales primero, si no hay, generar preview
+      try {
+        const officialBrackets = await getBracketsByEvent(eventId);
+        if (officialBrackets.length > 0) {
+          // Filtrar solo brackets del evento actual
+          const filteredBrackets = officialBrackets.filter(b => b.eventId === eventId);
+          setPreviewBrackets(filteredBrackets);
+        } else if (participantsWithData.length > 0 && event) {
+          // Solo generar preview si no hay brackets oficiales
+          const bracketType = event.bracketType || '1v1';
+          const participantsPerBracket = event.participantsPerBracket || 2;
+          const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
+          setPreviewBrackets(preview);
+        }
+      } catch (error) {
+        console.error('Error cargando brackets:', error);
+        // Si hay error, generar preview como fallback
+        if (participantsWithData.length > 0 && event) {
+          const bracketType = event.bracketType || '1v1';
+          const participantsPerBracket = event.participantsPerBracket || 2;
+          const preview = generatePreviewBrackets(participantsWithData, bracketType, participantsPerBracket);
+          setPreviewBrackets(preview);
+        }
       }
 
       // Cargar conteo de votos
