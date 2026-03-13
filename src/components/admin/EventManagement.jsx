@@ -238,15 +238,17 @@ const EventManagement = () => {
   };
 
   const handleDeleteEvent = async (eventId) => {
-    if (!confirm('¿Está seguro de eliminar este evento?')) {
+    if (!confirm('¿Está seguro de eliminar este evento? Esto eliminará también todos los participantes, votos, apuestas y brackets asociados.')) {
       return;
     }
 
     try {
       await deleteEvent(eventId);
+      alert('Evento eliminado exitosamente');
       loadData();
     } catch (error) {
-      alert('Error al eliminar evento');
+      console.error('Error completo al eliminar evento:', error);
+      alert('Error al eliminar evento: ' + (error.message || 'Error desconocido. Verifica la consola para más detalles.'));
     }
   };
 

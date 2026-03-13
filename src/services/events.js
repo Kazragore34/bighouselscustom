@@ -116,14 +116,64 @@ export const updateEvent = async (eventId, updates) => {
   }
 };
 
-// Eliminar evento
+// Eliminar evento y datos relacionados
 export const deleteEvent = async (eventId) => {
   try {
+    // Primero eliminar datos relacionados (participantes, votos, apuestas, brackets)
+    // Nota: Las reglas de Firestore pueden requerir permisos especiales para eliminar en cascada
+    
+    // Eliminar participantes del evento
+    try {
+      const participantsRef = collection(db, 'eventParticipants');
+      const participantsQuery = query(participantsRef, where('eventId', '==', eventId));
+      const participantsSnapshot = await getDocs(participantsQuery);
+      const deleteParticipantsPromises = participantsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deleteParticipantsPromises);
+    } catch (err) {
+      console.warn('Error eliminando participantes (puede ser normal si no hay):', err);
+    }
+
+    // Eliminar votos del evento
+    try {
+      const votesRef = collection(db, 'votes');
+      const votesQuery = query(votesRef, where('eventId', '==', eventId));
+      const votesSnapshot = await getDocs(votesQuery);
+      const deleteVotesPromises = votesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deleteVotesPromises);
+    } catch (err) {
+      console.warn('Error eliminando votos (puede ser normal si no hay):', err);
+    }
+
+    // Eliminar apuestas del evento
+    try {
+      const betsRef = collection(db, 'bets');
+      const betsQuery = query(betsRef, where('eventId', '==', eventId));
+      const betsSnapshot = await getDocs(betsQuery);
+      const deleteBetsPromises = betsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deleteBetsPromises);
+    } catch (err) {
+      console.warn('Error eliminando apuestas (puede ser normal si no hay):', err);
+    }
+
+    // Eliminar brackets del evento
+    try {
+      const bracketsRef = collection(db, 'brackets');
+      const bracketsQuery = query(bracketsRef, where('eventId', '==', eventId));
+      const bracketsSnapshot = await getDocs(bracketsQuery);
+      const deleteBracketsPromises = bracketsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deleteBracketsPromises);
+    } catch (err) {
+      console.warn('Error eliminando brackets (puede ser normal si no hay):', err);
+    }
+
+    // Finalmente eliminar el evento
     const eventRef = doc(db, 'events', eventId);
     await deleteDoc(eventRef);
+    
     return true;
   } catch (error) {
-    throw error;
+    console.error('Error en deleteEvent:', error);
+    throw new Error(error.message || 'No se pudo eliminar el evento. Verifica los permisos de Firestore.');
   }
 };
 
