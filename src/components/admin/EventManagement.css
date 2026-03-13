@@ -83,6 +83,12 @@
   color: white;
 }
 
+.badge-pot {
+  background: linear-gradient(135deg, #4caf50, #45a049);
+  color: white;
+  font-weight: 700;
+}
+
 .event-actions {
   display: flex;
   gap: 10px;

@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
-import { getPendingBets, confirmBet } from '../../services/bets';
+import { getPendingBets, confirmBet, getBetsByEvent } from '../../services/bets';
 import { getUserById } from '../../services/users';
 import { useAuth } from '../../context/AuthContext';
-import { Check, X, DollarSign, Clock } from 'lucide-react';
+import { getAllEvents } from '../../services/events';
+import { Check, X, DollarSign, Clock, TrendingUp } from 'lucide-react';
 import './BetConfirmation.css';
 
 const BetConfirmation = () => {
   const { user } = useAuth();
   const [pendingBets, setPendingBets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [totalPot, setTotalPot] = useState(0); // Bote total de todas las apuestas confirmadas
+  const [eventPots, setEventPots] = useState({}); // Bote por evento
 
   useEffect(() => {
     loadPendingBets();
+    loadTotalPot();
   }, []);
 
   const loadPendingBets = async () => {
@@ -42,6 +46,35 @@ const BetConfirmation = () => {
     }
   };
 
+  const loadTotalPot = async () => {
+    try {
+      const events = await getAllEvents();
+      let total = 0;
+      const potsByEvent = {};
+
+      for (const event of events) {
+        try {
+          const bets = await getBetsByEvent(event.id);
+          const confirmedBets = bets.filter(b => b.status === 'confirmed');
+          const eventTotal = confirmedBets.reduce((sum, bet) => sum + bet.amount, 0);
+          total += eventTotal;
+          potsByEvent[event.id] = {
+            eventName: event.name,
+            total: eventTotal,
+            count: confirmedBets.length
+          };
+        } catch (error) {
+          console.error(`Error cargando apuestas para evento ${event.id}:`, error);
+        }
+      }
+
+      setTotalPot(total);
+      setEventPots(potsByEvent);
+    } catch (error) {
+      console.error('Error cargando bote total:', error);
+    }
+  };
+
   const handleConfirmBet = async (betId) => {
     if (!confirm('¿Confirmar el pago de esta apuesta?')) {
       return;
@@ -51,6 +84,7 @@ const BetConfirmation = () => {
       await confirmBet(betId, user.id);
       alert('Apuesta confirmada exitosamente');
       loadPendingBets();
+      loadTotalPot(); // Recargar bote total después de confirmar
     } catch (error) {
       alert('Error al confirmar apuesta');
     }

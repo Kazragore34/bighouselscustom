@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAllEvents, createEvent, updateEvent, deleteEvent, getEventParticipants, addParticipantsToEvent, closeParticipantsList, getEventById } from '../../services/events';
 import { generateSmartBrackets } from '../../services/brackets';
 import { getAllUsers, getUserById } from '../../services/users';
+import { getBetsByEvent } from '../../services/bets';
 import { fileToBase64 } from '../../utils/imageUtils';
 import { Plus, Edit, Trash2, Upload, Users, UserPlus, X, Trophy } from 'lucide-react';
 import ParticipantsModal from './ParticipantsModal';
@@ -34,6 +35,7 @@ const EventManagement = () => {
   const [eventParticipants, setEventParticipants] = useState([]);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [currentEventForParticipants, setCurrentEventForParticipants] = useState(null);
+  const [eventTotals, setEventTotals] = useState({}); // { eventId: { totalBets: number, confirmedBetsCount: number, pendingBetsCount: number } }
 
   useEffect(() => {
     loadData();
@@ -50,6 +52,25 @@ const EventManagement = () => {
       // Mostrar solo usuarios PARTICIPANTE para agregar como participantes del evento
       // VOTANTE_APOSTADOR puede votar/apostar pero NO aparece en la lista de participantes
       setUsers(usersData.filter(u => u.enabled && u.userType === 'PARTICIPANTE'));
+      
+      // Cargar totales de apuestas para cada evento
+      const totals = {};
+      for (const event of eventsData) {
+        try {
+          const bets = await getBetsByEvent(event.id);
+          const confirmedBets = bets.filter(b => b.status === 'confirmed');
+          const totalBets = confirmedBets.reduce((sum, bet) => sum + bet.amount, 0);
+          totals[event.id] = {
+            totalBets,
+            confirmedBetsCount: confirmedBets.length,
+            pendingBetsCount: bets.filter(b => b.status === 'pending').length
+          };
+        } catch (error) {
+          console.error(`Error cargando apuestas para evento ${event.id}:`, error);
+          totals[event.id] = { totalBets: 0, confirmedBetsCount: 0, pendingBetsCount: 0 };
+        }
+      }
+      setEventTotals(totals);
     } catch (error) {
       console.error('Error cargando datos:', error);
     } finally {
