@@ -17,7 +17,17 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
 
   useEffect(() => {
     if (isOpen && event) {
+      // Resetear estado cuando se abre el modal
+      setSelectedUserIds(new Set());
+      setEventParticipants([]);
+      setTeams([]);
       loadData();
+    } else if (!isOpen) {
+      // Limpiar estado cuando se cierra el modal
+      setSelectedUserIds(new Set());
+      setEventParticipants([]);
+      setTeams([]);
+      setSearchTerm('');
     }
   }, [isOpen, event]);
 
@@ -49,7 +59,8 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
 
       // Para eventos individuales, inicializar checkboxes con participantes existentes
       if (!isTeamEvent) {
-        const existingParticipantIds = new Set(participantsData.map(p => p.userId));
+        const existingParticipantIds = new Set(participantsData.map(p => p.userId).filter(Boolean));
+        console.log('Inicializando checkboxes con participantes:', Array.from(existingParticipantIds));
         setSelectedUserIds(existingParticipantIds);
       }
 
@@ -246,6 +257,8 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
         }
       }
 
+      // Recargar datos antes de cerrar para asegurar consistencia
+      await loadData();
       alert('Participantes guardados exitosamente');
       if (onUpdate) onUpdate();
       onClose();
