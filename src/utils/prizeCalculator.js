@@ -34,9 +34,17 @@ export const calculateOdds = async (eventId, participantId) => {
     const participantVotes = votes.filter(vote => vote.favoriteId === participantId).length;
     
     // Obtener todos los participantes del evento para asegurar que todos tengan mínimo 1 voto
+    // Obtener participantes solo si es necesario (para calcular totalParticipants)
     const { getEventParticipants } = await import('../services/events');
-    const eventParticipants = await getEventParticipants(eventId);
-    const totalParticipants = eventParticipants.length;
+    let totalParticipants = 1; // Default mínimo
+    try {
+      const eventParticipants = await getEventParticipants(eventId);
+      totalParticipants = eventParticipants.length || 1;
+    } catch (error) {
+      // Si falla, usar los votos para contar participantes únicos
+      const uniqueParticipants = new Set(votes.map(v => v.favoriteId));
+      totalParticipants = uniqueParticipants.size || 1;
+    }
     
     // Total de votos = votos reales + 1 voto invisible por cada participante sin votos
     // Esto asegura que todos los participantes cuenten para el cálculo de odds

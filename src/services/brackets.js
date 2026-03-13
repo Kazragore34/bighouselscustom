@@ -34,31 +34,20 @@ export const createBracket = async (bracketData) => {
 export const getBracketsByEvent = async (eventId) => {
   try {
     const bracketsRef = collection(db, 'brackets');
-    // Intentar con orderBy primero, si falla (por falta de índice), intentar sin orderBy
-    let querySnapshot;
-    try {
-      const q = query(
-        bracketsRef,
-        where('eventId', '==', eventId),
-        orderBy('round', 'asc')
-      );
-      querySnapshot = await getDocs(q);
-    } catch (orderByError) {
-      // Si falla por falta de índice, intentar sin orderBy y ordenar en memoria
-      console.warn('Error con orderBy, ordenando en memoria:', orderByError);
-      const q = query(
-        bracketsRef,
-        where('eventId', '==', eventId)
-      );
-      querySnapshot = await getDocs(q);
-    }
+    // NO usar orderBy para evitar necesidad de índice compuesto
+    // Ordenar siempre en memoria
+    const q = query(
+      bracketsRef,
+      where('eventId', '==', eventId)
+    );
+    const querySnapshot = await getDocs(q);
     
     const brackets = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
     
-    // Ordenar en memoria por round si no se pudo hacer con orderBy
+    // Ordenar en memoria por round (ascendente)
     brackets.sort((a, b) => (a.round || 0) - (b.round || 0));
     
     return brackets;
