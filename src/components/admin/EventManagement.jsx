@@ -9,7 +9,7 @@ import { generateSmartBrackets } from '../../services/brackets';
 import { getAllUsers, getUserById } from '../../services/users';
 import { getBetsByEvent } from '../../services/bets';
 import { fileToBase64 } from '../../utils/imageUtils';
-import { Plus, Edit, Trash2, Users, Trophy, X, Lock } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Trophy, X, Lock, Play } from 'lucide-react';
 import ParticipantsModal from './ParticipantsModal';
 import './admin-shared.css';
 import './EventManagement.css';
@@ -284,6 +284,12 @@ const EventManagement = () => {
                 <div className="table-actions" style={{ flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
                   <button className="btn-table-action btn-table-edit" onClick={() => handleEditEvent(event)}>
                     <Edit size={12} /> Editar
+                  </button>
+                  <button
+                    className="btn-table-action btn-table-neutral"
+                    onClick={() => navigate(`/admin/eventos/${event.id}`)}
+                  >
+                    <Play size={12} /> Panel
                   </button>
                   <button
                     className="btn-table-action btn-table-neutral"

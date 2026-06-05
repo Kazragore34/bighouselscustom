@@ -7,7 +7,6 @@ import {
   updateDoc,
   query,
   where,
-  orderBy,
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -101,15 +100,33 @@ export const getPendingBets = async () => {
   }
 };
 
-// Confirmar apuesta (admin)
+// Confirmar apuesta (admin) — dispara notificación al apostador
 export const confirmBet = async (betId, adminUserId) => {
   try {
     const betRef = doc(db, 'bets', betId);
+    const betSnap = await getDoc(betRef);
+
     await updateDoc(betRef, {
       status: 'confirmed',
       confirmedBy: adminUserId,
       confirmedAt: serverTimestamp()
     });
+
+    // Notificar al usuario
+    if (betSnap.exists()) {
+      const bet = betSnap.data();
+      try {
+        const { notifyBetConfirmed } = await import('./notifications');
+        const { checkBadgesOnBetConfirmed } = await import('./badges');
+        const { getUserById } = await import('./users');
+        const participant = await getUserById(bet.participantId).catch(() => ({ username: 'participante' }));
+        await notifyBetConfirmed(bet.userId, participant.username, bet.amount, bet.eventId, betId);
+        await checkBadgesOnBetConfirmed(bet.userId);
+      } catch (e) {
+        console.warn('Error enviando notificación de confirmación:', e);
+      }
+    }
+
     return true;
   } catch (error) {
     throw error;

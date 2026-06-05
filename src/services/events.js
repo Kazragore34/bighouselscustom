@@ -368,12 +368,12 @@ export const getEventParticipants = async (eventId) => {
   }
 };
 
-// Establecer ganador del evento
+// Establecer ganador del evento — notifica a todos los apostadores
 export const setEventWinner = async (eventId, winnerId, winnerTeamId = null) => {
   try {
     const eventRef = doc(db, 'events', eventId);
     const updates = {};
-    
+
     if (winnerTeamId) {
       updates.winnerTeamId = winnerTeamId;
       updates.winnerId = null;
@@ -381,9 +381,45 @@ export const setEventWinner = async (eventId, winnerId, winnerTeamId = null) => 
       updates.winnerId = winnerId;
       updates.winnerTeamId = null;
     }
-    
+
     updates.winnerSetAt = serverTimestamp();
     await updateDoc(eventRef, updates);
+
+    // Notificar a apostadores (ganadores y perdedores)
+    try {
+      const { notifyBetWon, notifyBetLost } = await import('./notifications');
+      const { getUserById } = await import('./users');
+      const { getBetsByEvent } = await import('./bets');
+
+      const [event, bets] = await Promise.all([
+        getEventById(eventId),
+        getBetsByEvent(eventId),
+      ]);
+
+      const confirmedBets = bets.filter(b => b.status === 'confirmed');
+      const winnerName = winnerId
+        ? (await getUserById(winnerId).catch(() => ({ username: 'el ganador' }))).username
+        : 'el equipo ganador';
+
+      const { checkBadgesOnBetWon, checkBadgesOnEventWin } = await import('./badges');
+
+      await Promise.all(confirmedBets.map(async bet => {
+        if (bet.participantId === winnerId || bet.teamId === winnerTeamId) {
+          await notifyBetWon(bet.userId, winnerName, '—', eventId, bet.id).catch(() => {});
+          await checkBadgesOnBetWon(bet.userId).catch(() => {});
+        } else {
+          await notifyBetLost(bet.userId, winnerName, eventId, bet.id).catch(() => {});
+        }
+      }));
+
+      // Insignia al ganador como participante
+      if (winnerId) {
+        await checkBadgesOnEventWin(winnerId, event.eventType).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Error enviando notificaciones de resultado:', e);
+    }
+
     return true;
   } catch (error) {
     throw error;

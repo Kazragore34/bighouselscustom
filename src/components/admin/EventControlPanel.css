@@ -1,0 +1,78 @@
+.ecp-info-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.ecp-info-chip strong {
+  color: var(--text-primary);
+}
+
+/* Lista de rondas */
+.rounds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.round-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: all 0.2s;
+}
+
+.round-card.active-round {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 18px var(--gold-glow);
+}
+
+.round-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.round-number {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+
+.round-status-badge {
+  display: inline-flex;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.round-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.round-card-stats strong {
+  color: var(--text-primary);
+}
+
+.round-card-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

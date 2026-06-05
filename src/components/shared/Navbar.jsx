@@ -1,133 +1,125 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Bell, Check, X } from 'lucide-react';
-import { getPendingInvitations, acceptInvitation, rejectInvitation, getTeamById } from '../../services/teams';
-import { getUserById } from '../../services/users';
+import { LogOut, Bell } from 'lucide-react';
+import {
+  getNotificationsByUser,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from '../../services/notifications';
 import './Navbar.css';
 
-// Componente de logo de marca — cambiar aquí cuando haya SVG
+// Componente de logo de marca — reemplazar con SVG cuando esté listo
 const BrandLogo = () => (
-  <div className="navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
     <span className="brand-icon">◈</span>
     <span className="brand-name">VANTAGE</span>
   </div>
 );
 
+const NOTIF_ICONS = {
+  apuesta_confirmada: '✅',
+  apuesta_ganada: '🎉',
+  apuesta_perdida: '❌',
+  evento_inicio: '📢',
+  evento_ronda: '⚔️',
+  insignia: '🏅',
+};
+
 const NotificationsWidget = () => {
   const { user } = useAuth();
-  const [invitations, setInvitations] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [notifs, setNotifs] = useState([]);
+  const [show, setShow] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!user?.id) return;
+    const data = await getNotificationsByUser(user.id);
+    setNotifs(data);
+  }, [user?.id]);
 
   useEffect(() => {
-    if (user) {
-      loadInvitations();
-      const interval = setInterval(loadInvitations, 30000);
+    if (user?.id) {
+      load();
+      const interval = setInterval(load, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user?.id, load]);
 
-  const loadInvitations = async () => {
-    if (!user) return;
-    try {
-      const pending = await getPendingInvitations(user.id);
-      const withData = await Promise.all(
-        pending.map(async (inv) => {
-          try {
-            const [fromUser, teamData] = await Promise.all([
-              getUserById(inv.fromUserId).catch(() => ({ username: 'Usuario' })),
-              getTeamById(inv.teamId).catch(() => ({ name: 'Equipo' }))
-            ]);
-            return { ...inv, fromUserName: fromUser.username || 'Usuario', teamName: teamData?.name || 'Equipo' };
-          } catch {
-            return { ...inv, fromUserName: 'Usuario', teamName: 'Equipo' };
-          }
-        })
-      );
-      setInvitations(withData);
-    } catch (error) {
-      console.error('Error cargando invitaciones:', error);
+  const unread = notifs.filter(n => !n.read).length;
+
+  const handleOpen = () => {
+    setShow(s => !s);
+  };
+
+  const handleRead = async (notif) => {
+    if (!notif.read) await markNotificationRead(notif.id);
+    setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    if (notif.relatedEventId) {
+      setShow(false);
+      navigate(`/events/${notif.relatedEventId}`);
     }
   };
 
-  const handleAccept = async (invitationId, e) => {
-    e.stopPropagation();
-    setLoading(true);
-    try {
-      await acceptInvitation(invitationId);
-      await loadInvitations();
-    } catch (error) {
-      alert('Error al aceptar: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReject = async (invitationId, e) => {
-    e.stopPropagation();
-    setLoading(true);
-    try {
-      await rejectInvitation(invitationId);
-      await loadInvitations();
-    } catch (error) {
-      alert('Error al rechazar: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleMarkAll = async () => {
+    await markAllNotificationsRead(user.id);
+    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   if (!user) return null;
 
   return (
     <div className="notifications-widget">
-      <button
-        className="notifications-button"
-        onClick={() => setShowDropdown(!showDropdown)}
-        title="Notificaciones"
-      >
+      <button className="notifications-button" onClick={handleOpen} title="Notificaciones">
         <Bell size={18} />
-        {invitations.length > 0 && (
-          <span className="notification-badge">{invitations.length}</span>
-        )}
+        {unread > 0 && <span className="notification-badge">{unread > 9 ? '9+' : unread}</span>}
       </button>
 
-      {showDropdown && (
+      {show && (
         <>
-          <div className="dropdown-backdrop" onClick={() => setShowDropdown(false)} />
+          <div className="dropdown-backdrop" onClick={() => setShow(false)} />
           <div className="notifications-dropdown">
             <div className="notifications-header">
-              <h3>Invitaciones</h3>
-              <button onClick={() => setShowDropdown(false)} className="close-dropdown">×</button>
+              <h3>Notificaciones</h3>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {unread > 0 && (
+                  <button
+                    onClick={handleMarkAll}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.72rem', cursor: 'pointer', padding: 0 }}
+                  >
+                    Leer todas
+                  </button>
+                )}
+                <button onClick={() => setShow(false)} className="close-dropdown">×</button>
+              </div>
             </div>
-            {invitations.length === 0 ? (
-              <div className="no-notifications">Sin invitaciones pendientes</div>
+
+            {notifs.length === 0 ? (
+              <div className="no-notifications">Sin notificaciones</div>
             ) : (
               <div className="notifications-list">
-                {invitations.map(inv => (
-                  <div key={inv.id} className="notification-item">
+                {notifs.slice(0, 20).map(n => (
+                  <div
+                    key={n.id}
+                    className={`notification-item${n.read ? '' : ' unread'}`}
+                    onClick={() => handleRead(n)}
+                    style={{ cursor: n.relatedEventId ? 'pointer' : 'default' }}
+                  >
+                    <div style={{ fontSize: '1.1rem', flexShrink: 0 }}>
+                      {NOTIF_ICONS[n.type] || '🔔'}
+                    </div>
                     <div className="notification-content">
-                      <strong>{inv.fromUserName}</strong> te invitó al equipo{' '}
-                      <strong>{inv.teamName}</strong>
+                      <strong>{n.title}</strong>
+                      <div style={{ fontSize: '0.82rem', marginTop: 2 }}>{n.message}</div>
+                      {n.createdAt?.toDate && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 3 }}>
+                          {n.createdAt.toDate().toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+                        </div>
+                      )}
                     </div>
-                    <div className="notification-actions">
-                      <button
-                        onClick={(e) => handleAccept(inv.id, e)}
-                        className="btn-notification-accept"
-                        disabled={loading}
-                        title="Aceptar"
-                      >
-                        <Check size={13} />
-                      </button>
-                      <button
-                        onClick={(e) => handleReject(inv.id, e)}
-                        className="btn-notification-reject"
-                        disabled={loading}
-                        title="Rechazar"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
+                    {!n.read && (
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--gold-primary)', flexShrink: 0 }} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -154,57 +146,22 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       <div className="navbar-content">
-        <div onClick={() => navigate('/dashboard')}>
+        <div onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
           <BrandLogo />
         </div>
 
         <div className="navbar-menu">
-          <button
-            className={isActive('/dashboard') ? 'active' : ''}
-            onClick={() => navigate('/dashboard')}
-          >
-            Inicio
-          </button>
-          <button
-            className={isActive('/events') ? 'active' : ''}
-            onClick={() => navigate('/events')}
-          >
-            Eventos
-          </button>
-          <button
-            className={isActive('/ganadores') ? 'active' : ''}
-            onClick={() => navigate('/ganadores')}
-          >
-            Ganadores
-          </button>
-          <button
-            className={isActive('/equipos') ? 'active' : ''}
-            onClick={() => navigate('/equipos')}
-          >
-            Equipos
-          </button>
+          <button className={isActive('/dashboard') ? 'active' : ''} onClick={() => navigate('/dashboard')}>Inicio</button>
+          <button className={isActive('/events') ? 'active' : ''} onClick={() => navigate('/events')}>Eventos</button>
+          <button className={isActive('/ganadores') ? 'active' : ''} onClick={() => navigate('/ganadores')}>Ganadores</button>
+          <button className={isActive('/equipos') ? 'active' : ''} onClick={() => navigate('/equipos')}>Equipos</button>
 
           {isAdmin && (
             <>
               <div className="navbar-admin-sep" />
-              <button
-                className={isActive('/admin/usuarios') ? 'active' : ''}
-                onClick={() => navigate('/admin/usuarios')}
-              >
-                Usuarios
-              </button>
-              <button
-                className={isActive('/admin/eventos') ? 'active' : ''}
-                onClick={() => navigate('/admin/eventos')}
-              >
-                Eventos
-              </button>
-              <button
-                className={isActive('/admin/apuestas') ? 'active' : ''}
-                onClick={() => navigate('/admin/apuestas')}
-              >
-                Apuestas
-              </button>
+              <button className={isActive('/admin/usuarios') ? 'active' : ''} onClick={() => navigate('/admin/usuarios')}>Usuarios</button>
+              <button className={isActive('/admin/eventos') ? 'active' : ''} onClick={() => navigate('/admin/eventos')}>Eventos</button>
+              <button className={isActive('/admin/apuestas') ? 'active' : ''} onClick={() => navigate('/admin/apuestas')}>Apuestas</button>
             </>
           )}
         </div>
@@ -212,11 +169,7 @@ const Navbar = () => {
         <div className="navbar-user">
           <NotificationsWidget />
 
-          <div
-            className="user-info clickable"
-            onClick={() => navigate('/perfil')}
-            title="Mi perfil"
-          >
+          <div className="user-info clickable" onClick={() => navigate('/perfil')} title="Mi perfil">
             {user?.photoURL ? (
               <img src={user.photoURL} alt="avatar" className="user-avatar" />
             ) : (

@@ -14,6 +14,7 @@ import UserManagement from './components/admin/UserManagement';
 import EventManagement from './components/admin/EventManagement';
 import BetConfirmation from './components/admin/BetConfirmation';
 import BracketEditor from './components/admin/BracketEditor';
+import EventControlPanel from './components/admin/EventControlPanel';
 import HomePublic from './components/public/HomePublic';
 import './App.css';
 
@@ -78,6 +79,7 @@ function App() {
         <Route path="/admin/apuestas" element={<AdminRoute><WithNav><BetConfirmation /></WithNav></AdminRoute>} />
         {/* alias legacy */}
         <Route path="/admin/bets" element={<Navigate to="/admin/apuestas" replace />} />
+        <Route path="/admin/eventos/:eventId" element={<AdminRoute><WithNav><EventControlPanel /></WithNav></AdminRoute>} />
         <Route
           path="/admin/events/:eventId/brackets"
           element={<AdminRoute><WithNav><BracketEditor /></WithNav></AdminRoute>}
