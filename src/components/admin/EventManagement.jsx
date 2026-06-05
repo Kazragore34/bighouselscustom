@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   getAllEvents, createEvent, updateEvent, deleteEvent,
   getEventParticipants, addParticipantsToEvent, closeParticipantsList,
-  getEventById, setEventWinner
+  getEventById, setEventWinner, setEventWinners
 } from '../../services/events';
 import { generateSmartBrackets } from '../../services/brackets';
 import { getAllUsers, getUserById } from '../../services/users';
@@ -234,11 +234,12 @@ const EventManagement = () => {
     }
   };
 
-  const handleConfirmWinner = async (winner) => {
+  const handleConfirmWinner = async (winners) => {
+    // winners es array [{ userId, username, position }]
     const { event } = winnerModal;
     setWinnerModal({ open: false, event: null, participants: [] });
     try {
-      await setEventWinner(event.id, winner.userId, null);
+      await setEventWinners(event.id, winners);
       await updateEvent(event.id, { status: 'FINALIZADO' });
       loadData();
     } catch (error) {
@@ -564,6 +565,7 @@ const EventManagement = () => {
         onConfirm={handleConfirmWinner}
         participants={winnerModal.participants}
         eventName={winnerModal.event?.name || ''}
+        maxWinners={winnerModal.event?.totalWinners || 1}
       />
     </div>
   );

@@ -368,8 +368,16 @@ export const getEventParticipants = async (eventId) => {
   }
 };
 
+// Establecer múltiples ganadores del evento — notifica a todos los apostadores
+// winners: [{ userId, username, position }] (array ordenado por posición)
+export const setEventWinners = async (eventId, winners) => {
+  if (!winners || winners.length === 0) return;
+  const first = winners[0]; // 1er lugar = el que se usa para pagar apuestas
+  await setEventWinner(eventId, first.userId, null, winners);
+};
+
 // Establecer ganador del evento — notifica a todos los apostadores
-export const setEventWinner = async (eventId, winnerId, winnerTeamId = null) => {
+export const setEventWinner = async (eventId, winnerId, winnerTeamId = null, allWinners = null) => {
   try {
     const eventRef = doc(db, 'events', eventId);
     const updates = {};
@@ -381,7 +389,10 @@ export const setEventWinner = async (eventId, winnerId, winnerTeamId = null) => 
       updates.winnerId = winnerId;
       updates.winnerTeamId = null;
     }
-
+    // Guardar array de ganadores con posición si se proporcionan
+    if (allWinners && allWinners.length > 0) {
+      updates.winners = allWinners.map(w => ({ userId: w.userId, username: w.username, position: w.position }));
+    }
     updates.winnerSetAt = serverTimestamp();
     await updateDoc(eventRef, updates);
 
