@@ -11,6 +11,7 @@ import { getBetsByEvent } from '../../services/bets';
 import { fileToBase64 } from '../../utils/imageUtils';
 import { Plus, Edit, Trash2, Users, Trophy, X, Lock, Play } from 'lucide-react';
 import ParticipantsModal from './ParticipantsModal';
+import WinnerSelectModal from './WinnerSelectModal';
 import './admin-shared.css';
 import './EventManagement.css';
 
@@ -32,15 +33,12 @@ const COMPETITION_MODES = [
 ];
 
 const STATUSES = [
-  { value: 'BORRADOR', label: 'Borrador' },
-  { value: 'draft', label: 'Borrador (legacy)' },
-  { value: 'ACTIVO', label: 'Activo' },
-  { value: 'active', label: 'Activo (legacy)' },
-  { value: 'EN_CURSO', label: 'En Curso' },
-  { value: 'POSPUESTO', label: 'Pospuesto' },
+  { value: 'BORRADOR',   label: 'Borrador'   },
+  { value: 'ACTIVO',     label: 'Activo'     },
+  { value: 'EN_CURSO',   label: 'En Curso'   },
+  { value: 'POSPUESTO',  label: 'Pospuesto'  },
   { value: 'FINALIZADO', label: 'Finalizado' },
-  { value: 'finished', label: 'Finalizado (legacy)' },
-  { value: 'CANCELADO', label: 'Cancelado' },
+  { value: 'CANCELADO',  label: 'Cancelado'  },
 ];
 
 const STATUS_LABEL = {
@@ -87,6 +85,7 @@ const EventManagement = () => {
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [currentEventForParticipants, setCurrentEventForParticipants] = useState(null);
   const [eventTotals, setEventTotals] = useState({});
+  const [winnerModal, setWinnerModal] = useState({ open: false, event: null, participants: [] });
 
   useEffect(() => { loadData(); }, []);
 
@@ -219,14 +218,9 @@ const EventManagement = () => {
   };
 
   const handleSetWinner = async (event) => {
-    // Si es Modo E, redirigir al panel de rondas
     if (event.competitionMode === 'RONDAS_INDEPENDIENTES') {
       alert('Este evento usa Rondas Independientes. Usa el botón "Panel" para gestionar los ganadores por ronda.');
       return;
-    }
-    // Protección: si ya tiene ganador, pedir confirmación
-    if (event.winnerId) {
-      if (!confirm(`Este evento ya tiene un ganador asignado. ¿Quieres cambiarlo?`)) return;
     }
     try {
       const parts = await getEventParticipants(event.id);
@@ -234,21 +228,21 @@ const EventManagement = () => {
         try { return { ...p, ...await getUserById(p.userId) }; }
         catch { return { ...p, username: 'Desconocido' }; }
       }));
-      const opts = withData.map((p, i) => `${i + 1}. ${p.username || p.name}`).join('\n');
-      const sel = prompt(`Selecciona el ganador del evento:\n\n${opts}\n\nIngresa el número:`);
-      if (!sel) return;
-      const idx = parseInt(sel) - 1;
-      if (idx >= 0 && idx < withData.length) {
-        const winner = withData[idx];
-        if (!confirm(`¿Declarar a "${winner.username}" como ganador? Esto notificará a todos los apostadores.`)) return;
-        await setEventWinner(event.id, winner.userId, null);
-        // Marcar evento como finalizado automáticamente
-        await updateEvent(event.id, { status: 'FINALIZADO' });
-        alert(`✓ Ganador: ${winner.username}. Evento marcado como FINALIZADO.`);
-        loadData();
-      }
+      setWinnerModal({ open: true, event, participants: withData });
     } catch (error) {
       alert('Error: ' + error.message);
+    }
+  };
+
+  const handleConfirmWinner = async (winner) => {
+    const { event } = winnerModal;
+    setWinnerModal({ open: false, event: null, participants: [] });
+    try {
+      await setEventWinner(event.id, winner.userId, null);
+      await updateEvent(event.id, { status: 'FINALIZADO' });
+      loadData();
+    } catch (error) {
+      alert('Error al establecer ganador: ' + error.message);
     }
   };
 
@@ -562,6 +556,14 @@ const EventManagement = () => {
         isOpen={showParticipantsModal}
         onClose={() => { setShowParticipantsModal(false); setCurrentEventForParticipants(null); setSelectedParticipants([]); }}
         onUpdate={loadData}
+      />
+
+      <WinnerSelectModal
+        isOpen={winnerModal.open}
+        onClose={() => setWinnerModal({ open: false, event: null, participants: [] })}
+        onConfirm={handleConfirmWinner}
+        participants={winnerModal.participants}
+        eventName={winnerModal.event?.name || ''}
       />
     </div>
   );

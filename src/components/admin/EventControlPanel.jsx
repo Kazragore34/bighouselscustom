@@ -5,6 +5,7 @@ import { getUserById } from '../../services/users';
 import { getRoundsByEvent, openRound, closeRoundBetting, resolveRound } from '../../services/eventRounds';
 import { getBetsByEvent } from '../../services/bets';
 import { ArrowLeft, Play, Lock, Trophy, RefreshCw, Plus } from 'lucide-react';
+import WinnerSelectModal from './WinnerSelectModal';
 import './admin-shared.css';
 import './EventControlPanel.css';
 
@@ -23,6 +24,7 @@ const EventControlPanel = () => {
   const [roundBets, setRoundBets] = useState({});
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [resolveModal, setResolveModal] = useState({ open: false, round: null });
 
   useEffect(() => { loadAll(); }, [eventId]);
 
@@ -83,19 +85,17 @@ const EventControlPanel = () => {
     finally { setWorking(false); }
   };
 
-  const handleResolve = async (round) => {
-    const opts = participants.map((p, i) => `${i + 1}. ${p.username || p.name}`).join('\n');
-    const sel = prompt(`¿Quién ganó la Ronda ${round.roundNumber}?\n\n${opts}\n\nIngresa el número:`);
-    if (!sel) return;
-    const idx = parseInt(sel) - 1;
-    if (idx < 0 || idx >= participants.length) { alert('Número inválido'); return; }
-    const winner = participants[idx];
-    if (!confirm(`¿Declarar ganador a ${winner.username} en Ronda ${round.roundNumber}?`)) return;
+  const handleResolve = (round) => {
+    setResolveModal({ open: true, round });
+  };
+
+  const handleConfirmRoundWinner = async (winner) => {
+    const { round } = resolveModal;
+    setResolveModal({ open: false, round: null });
     setWorking(true);
     try {
       const commissionPercent = event?.commissionPercent || event?.houseCommission || 10;
       const result = await resolveRound(round.id, eventId, winner.userId, winner.username, commissionPercent);
-      alert(`Ronda ${round.roundNumber} resuelta.\nPozo neto: $${result.netPool.toFixed(0)}\nComisión: $${result.commissionAmount.toFixed(0)}`);
       await loadAll();
     } catch (e) { alert('Error: ' + e.message); }
     finally { setWorking(false); }
@@ -106,9 +106,10 @@ const EventControlPanel = () => {
     return bets.reduce((s, b) => s + (b.amount || 0), 0);
   };
 
-  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando panel...</div>;
+  if (loading && rounds.length === 0) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando panel...</div>;
   if (!event) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Evento no encontrado</div>;
 
+  if (!event) return null;
   const isModE = event.competitionMode === 'RONDAS_INDEPENDIENTES';
 
   return (
@@ -226,6 +227,14 @@ const EventControlPanel = () => {
           </button>
         </div>
       )}
+
+      <WinnerSelectModal
+        isOpen={resolveModal.open}
+        onClose={() => setResolveModal({ open: false, round: null })}
+        onConfirm={handleConfirmRoundWinner}
+        participants={participants}
+        eventName={`${event?.name} — Ronda ${resolveModal.round?.roundNumber}`}
+      />
     </div>
   );
 };
