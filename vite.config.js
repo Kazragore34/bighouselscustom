@@ -3,17 +3,21 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/', // Asegura que las rutas funcionen correctamente
+  base: '/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    emptyOutDir: true, // Limpiar carpeta dist antes de build
+    emptyOutDir: true,
     rollupOptions: {
       output: {
+        // Nombres de archivo estables sin hash compuesto
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'firebase-vendor': ['firebase/app', 'firebase/firestore']
+          'firebase-vendor': ['firebase/app', 'firebase/firestore', 'firebase/auth'],
         }
       }
     }

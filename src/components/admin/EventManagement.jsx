@@ -154,7 +154,7 @@ const EventManagement = () => {
       competitionMode: event.competitionMode || (event.bracketType === '1v1' ? 'BRACKET_TORNEO' : 'CARRERA_CLASICA'),
       isTeamEvent: event.isTeamEvent || false,
       teamSize: event.teamSize || 1,
-      status: event.status || 'BORRADOR',
+      status: ({ draft: 'BORRADOR', active: 'ACTIVO', finished: 'FINALIZADO', cancelled: 'CANCELADO', completed: 'FINALIZADO' }[event.status] || event.status || 'BORRADOR'),
       bannerURL: event.bannerURL || '',
       bannerFile: null,
       betDeadline: event.betDeadline || '',
@@ -324,8 +324,8 @@ const EventManagement = () => {
                   >
                     <Users size={12} /> Participantes
                   </button>
-                  {/* Brackets solo para modos que lo necesitan */}
-                  {['BRACKET_TORNEO', 'MULTI_FASE', '1v1', '2v2'].includes(event.competitionMode || event.bracketType) && (
+                  {/* Brackets solo para eventos con modo de torneo/bracket */}
+                  {['BRACKET_TORNEO', 'MULTI_FASE'].includes(event.competitionMode) && (
                     <>
                       <button
                         className="btn-table-action btn-table-neutral"

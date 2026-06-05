@@ -25,7 +25,12 @@ const Winners = () => {
     try {
       setLoading(true);
       const allEvents = await getAllEvents();
-      const finished = allEvents.filter(e => ['finished', 'FINALIZADO', 'completed'].includes(e.status));
+      // Incluir eventos con ganador declarado (sea cual sea el estado)
+      const finished = allEvents.filter(e =>
+        e.winnerId ||
+        (e.winners && e.winners.length > 0) ||
+        ['finished', 'FINALIZADO', 'completed'].includes(e.status)
+      );
 
       // --- Tab 1: Dinero ganado — usar calculateWinnerPayouts para precisión ---
       // (los status GANADORA/won no se graban automáticamente aún, calculamos desde eventos finalizados)
@@ -61,17 +66,21 @@ const Winners = () => {
 
       // --- Tab 2: Victorias como participante ---
       const victoriasMap = {};
-      for (const event of finished) {
-        if (event.winnerId) {
-          if (!victoriasMap[event.winnerId]) {
+      // Usar todos los eventos que tengan ganador (campo winners[] o winnerId)
+      const eventsWithWinner = allEvents.filter(e => e.winnerId || (e.winners && e.winners.length > 0));
+      for (const event of eventsWithWinner) {
+        // Soportar campo winners[] (múltiples) y winnerId (simple)
+        const winnerIds = event.winners?.map(w => w.userId) || (event.winnerId ? [event.winnerId] : []);
+        for (const wid of winnerIds) {
+          if (!victoriasMap[wid]) {
             try {
-              const u = await getUserById(event.winnerId).catch(() => null);
-              if (u) victoriasMap[event.winnerId] = { ...u, victorias: 0, eventTypes: [] };
+              const u = await getUserById(wid).catch(() => null);
+              if (u) victoriasMap[wid] = { ...u, victorias: 0, eventTypes: [] };
             } catch {}
           }
-          if (victoriasMap[event.winnerId]) {
-            victoriasMap[event.winnerId].victorias++;
-            if (event.eventType) victoriasMap[event.winnerId].eventTypes.push(event.eventType);
+          if (victoriasMap[wid]) {
+            victoriasMap[wid].victorias++;
+            if (event.eventType) victoriasMap[wid].eventTypes.push(event.eventType);
           }
         }
       }

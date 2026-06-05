@@ -1,53 +1,31 @@
-name: Build and Deploy to Public
+# Deploy DESACTIVADO — se hace manual: npm run build + git push
+# Para reactivar: cambiar 'workflow_dispatch' por 'push: branches: [main]'
+name: Build and Deploy (manual)
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
         cache: 'npm'
-    
     - name: Install dependencies
       run: npm ci
-    
     - name: Build project
       run: npm run build
-      env:
-        VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-        VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-        VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-        VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-        VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-        VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-        VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
-    
-    - name: Copy dist files to root
-      run: |
-        # Copiar archivos de dist a la raíz
-        cp -r dist/* .
-        cp dist/.htaccess . 2>/dev/null || true
-        
-        # Listar lo que se copió
-        ls -la
-    
+    - name: Copy dist to root
+      run: cp -r dist/* .
     - name: Commit and push
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .
-        git diff --staged --quiet || git commit -m "Auto-build: Deploy compiled files to public_html [skip ci]"
+        git diff --staged --quiet || git commit -m "Manual deploy [skip ci]"
         git push origin main
