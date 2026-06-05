@@ -1,59 +1,47 @@
 import { useState, useEffect } from 'react';
-import { getBracketsByEvent, updateBracket, generateSmartBrackets, updateMatchWinner } from '../../services/brackets';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getBracketsByEvent, generateSmartBrackets, updateMatchWinner } from '../../services/brackets';
 import { getEventParticipants, getEventById } from '../../services/events';
 import { getUserById } from '../../services/users';
-import { Shuffle, Save, RefreshCw, Trophy, Check } from 'lucide-react';
+import { Shuffle, RefreshCw, Trophy, Check, ArrowLeft } from 'lucide-react';
+import './admin-shared.css';
 import './BracketEditor.css';
-
-import { useParams } from 'react-router-dom';
 
 const BracketEditor = () => {
   const { eventId } = useParams();
+  const navigate = useNavigate();
   const [brackets, setBrackets] = useState([]);
   const [participants, setParticipants] = useState([]);
-  const [participantsData, setParticipantsData] = useState({});
+  const [pData, setPData] = useState({});
   const [loading, setLoading] = useState(true);
   const [round, setRound] = useState(1);
   const [event, setEvent] = useState(null);
 
-  useEffect(() => {
-    loadData();
-  }, [eventId]);
+  useEffect(() => { loadData(); }, [eventId]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [allBrackets, participantsData, eventData] = await Promise.all([
+      const [allBrackets, parts, evData] = await Promise.all([
         getBracketsByEvent(eventId),
         getEventParticipants(eventId),
-        getEventById(eventId)
+        getEventById(eventId),
       ]);
-      
-      // Filtrar solo brackets del evento actual para asegurar que no haya mezcla
-      const bracketsData = allBrackets.filter(b => b.eventId === eventId);
-      console.log('Brackets cargados para admin:', bracketsData.length, bracketsData);
-      
-      setBrackets(bracketsData);
-      setParticipants(participantsData);
-      setEvent(eventData);
-      
-      // Cargar datos completos de participantes
-      const participantsMap = {};
-      for (const p of participantsData) {
-        try {
-          const userData = await getUserById(p.userId);
-          participantsMap[p.userId] = userData;
-        } catch (err) {
-          participantsMap[p.userId] = { username: p.userId };
-        }
+      const filtered = allBrackets.filter(b => b.eventId === eventId);
+      setBrackets(filtered);
+      setParticipants(parts);
+      setEvent(evData);
+
+      const map = {};
+      for (const p of parts) {
+        try { map[p.userId] = await getUserById(p.userId); }
+        catch { map[p.userId] = { username: p.userId }; }
       }
-      setParticipantsData(participantsMap);
-      
-      // Establecer ronda actual (última ronda con matches pendientes o última ronda)
-      if (bracketsData.length > 0) {
-        const lastRound = bracketsData[bracketsData.length - 1];
-        const hasPendingMatches = lastRound.matches.some(m => m.status === 'pending');
-        setRound(hasPendingMatches ? bracketsData.length : Math.max(1, bracketsData.length - 1));
+      setPData(map);
+
+      if (filtered.length > 0) {
+        const last = filtered[filtered.length - 1];
+        setRound(last.matches.some(m => m.status === 'pending') ? filtered.length : Math.max(1, filtered.length - 1));
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -62,178 +50,143 @@ const BracketEditor = () => {
     }
   };
 
-  const handleGenerateBrackets = async () => {
-    // Solo permitir generar si la lista está cerrada o si no hay brackets oficiales
-    if (event?.participantsListClosed) {
-      alert('La lista de participantes ya está cerrada. Usa el botón "Cerrar Lista" en la gestión de eventos para regenerar el bracket final.');
-      return;
-    }
-    
-    if (!confirm('¿Generar brackets automáticamente? Esto reemplazará los brackets existentes.')) {
-      return;
-    }
-
+  const handleGenerate = async () => {
+    if (!confirm('¿Generar bracket oficial? Sobreescribirá el bracket actual y será visible para todos los usuarios.')) return;
     try {
       setLoading(true);
-      console.log('Generando brackets para evento:', eventId);
-      console.log('Participantes:', participants);
-      
-      // Obtener el tipo de bracket del evento
-      const bracketType = event?.bracketType || '1v1';
-      const participantsPerBracket = event?.participantsPerBracket || 2;
-      
-      console.log('Tipo de bracket:', bracketType, 'Participantes por bracket:', participantsPerBracket);
-      
-      await generateSmartBrackets(eventId, participants, bracketType, participantsPerBracket);
-      console.log('Brackets generados exitosamente');
-      alert('Brackets generados exitosamente');
+      const partsWithData = participants.map(p => ({ ...p, ...pData[p.userId] }));
+      await generateSmartBrackets(eventId, partsWithData, event?.bracketType || '1v1', event?.participantsPerBracket || 2);
       await loadData();
     } catch (error) {
-      console.error('Error completo al generar brackets:', error);
-      console.error('Stack:', error.stack);
-      alert('Error al generar brackets: ' + error.message);
+      alert('Error al generar: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-
   const handleSetWinner = async (matchId, winnerId) => {
     try {
-      const currentBracket = brackets[round - 1];
-      if (!currentBracket) return;
-
-      await updateMatchWinner(currentBracket.id, matchId, winnerId, eventId);
-      alert('Ganador establecido. La siguiente ronda se generará automáticamente si todos los matches están completos.');
-      await loadData(); // Recargar para ver la siguiente ronda
+      const current = brackets[round - 1];
+      if (!current) return;
+      await updateMatchWinner(current.id, matchId, winnerId, eventId);
+      await loadData();
     } catch (error) {
-      alert('Error al establecer ganador: ' + error.message);
+      alert('Error: ' + error.message);
     }
   };
 
-  const handleSaveBrackets = async () => {
-    try {
-      const currentBracket = brackets[round - 1];
-      if (currentBracket) {
-        await updateBracket(currentBracket.id, { matches: currentBracket.matches });
-        alert('Brackets guardados exitosamente');
-      }
-    } catch (error) {
-      alert('Error al guardar brackets');
-    }
-  };
+  const getName = (id) => pData[id]?.username || id;
 
-  if (loading) {
-    return <div className="loading">Cargando brackets...</div>;
-  }
+  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando brackets...</div>;
 
-  // Si no hay brackets oficiales, mostrar opción para generarlos automáticamente
-  const hasOfficialBrackets = brackets.length > 0;
   const currentBracket = brackets[round - 1];
 
   return (
-    <div className="bracket-editor">
-      <div className="editor-header">
-        <h2>Editor de Brackets</h2>
-        <div className="editor-actions">
-          <button onClick={handleGenerateBrackets} className="btn-generate">
-            <Shuffle size={18} />
-            Generar Automáticamente
+    <div className="admin-page">
+      <div className="admin-page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => navigate('/admin/eventos')}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--border-gold)', color: 'var(--text-muted)', padding: '7px 12px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem' }}
+          >
+            <ArrowLeft size={14} /> Volver
           </button>
-          <button onClick={handleSaveBrackets} className="btn-save">
-            <Save size={18} />
-            Guardar Cambios
+          <h1>Editor de <span>Bracket</span></h1>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={handleGenerate} className="btn-add" style={{ background: 'transparent', color: 'var(--gold-primary)', border: '1px solid var(--border-gold)' }}>
+            <Shuffle size={14} /> Generar Bracket
+          </button>
+          <button onClick={loadData} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--border-gold)', color: 'var(--text-muted)', padding: '8px 14px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem' }}>
+            <RefreshCw size={14} /> Actualizar
           </button>
         </div>
       </div>
 
-      {brackets.length > 0 && (
-        <div className="round-selector">
-          <label>Ronda:</label>
-          <select value={round} onChange={(e) => setRound(parseInt(e.target.value))}>
-            {brackets.map((_, index) => (
-              <option key={index} value={index + 1}>Ronda {index + 1}</option>
-            ))}
-          </select>
+      {/* Selector de ronda */}
+      {brackets.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ronda:</span>
+          {brackets.map((b, i) => (
+            <button
+              key={i}
+              onClick={() => setRound(i + 1)}
+              style={{
+                padding: '5px 14px',
+                borderRadius: 6,
+                border: round === i + 1 ? '1px solid var(--gold-primary)' : '1px solid var(--border-gold)',
+                background: round === i + 1 ? 'var(--gold-glow)' : 'transparent',
+                color: round === i + 1 ? 'var(--gold-primary)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: '0.82rem',
+                fontFamily: 'Cinzel, serif',
+              }}
+            >
+              {b.isFinal ? '◈ Final' : `R${i + 1}`}
+            </button>
+          ))}
         </div>
       )}
 
-      {!hasOfficialBrackets && (
-        <div className="no-brackets-message">
-          <p>No hay brackets oficiales creados aún.</p>
-          <p>Haz clic en "Generar Automáticamente" para crear brackets basados en votos y apuestas actuales.</p>
+      {/* Sin brackets */}
+      {brackets.length === 0 && (
+        <div className="admin-table-container" style={{ textAlign: 'center', padding: 48 }}>
+          <Trophy size={40} style={{ color: 'var(--gold-dark)', opacity: 0.3, marginBottom: 16 }} />
+          <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>No hay bracket generado aún.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 20 }}>
+            Asegúrate de haber añadido participantes al evento antes de generar.
+          </p>
+          <button onClick={handleGenerate} className="btn-add">
+            <Shuffle size={14} /> Generar Bracket Oficial
+          </button>
         </div>
       )}
 
-      {currentBracket ? (
-        <div className="brackets-container">
-          {currentBracket.matches.map((match, matchIndex) => {
-            const isCompleted = match.status === 'completed' && match.winnerId;
+      {/* Matches de la ronda actual */}
+      {currentBracket && (
+        <div className="bracket-editor-grid">
+          {currentBracket.matches.map((match, mi) => {
+            const done = match.status === 'completed' && match.winnerId;
             return (
-              <div key={matchIndex} className={`match-container ${isCompleted ? 'completed' : ''}`}>
-                <div className="match-header-editor">
-                  <h3>{match.isGroup ? `Grupo ${matchIndex + 1}` : match.isFinal ? '🏆 Final' : `Match ${matchIndex + 1}`}</h3>
-                  {isCompleted && (
-                    <span className="completed-badge">
-                      <Check size={14} />
-                      Completado
-                    </span>
-                  )}
+              <div key={match.id || mi} className={`editor-match-card${done ? ' done' : ''}`}>
+                <div className="editor-match-header">
+                  <span>{match.isGroup ? `Grupo ${mi + 1}` : match.isFinal ? '◈ Final' : `Match ${mi + 1}`}</span>
+                  {done && <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--gold-primary)' }}><Check size={12} /> Resuelto</span>}
                 </div>
-                <div className="match-participants-editor">
-                  {match.participants.map((participantId, pIndex) => {
-                    const participant = participantsData[participantId];
-                    const isWinner = match.winnerId === participantId;
-                    const isSelectable = !isCompleted && match.status === 'pending';
-                    
+
+                <div className="editor-participants">
+                  {match.participants?.map(pid => {
+                    const isWinner = match.winnerId === pid;
+                    const selectable = !done && match.status === 'pending';
                     return (
-                      <div 
-                        key={participantId} 
-                        className={`participant-item-editor ${isWinner ? 'winner' : ''} ${isSelectable ? 'selectable' : ''}`}
-                        onClick={() => {
-                          if (isSelectable) {
-                            handleSetWinner(match.id, participantId);
-                          }
-                        }}
+                      <div
+                        key={pid}
+                        className={`editor-participant${isWinner ? ' winner' : ''}${selectable ? ' selectable' : ''}`}
+                        onClick={() => selectable && handleSetWinner(match.id, pid)}
+                        title={selectable ? 'Clic para marcar ganador' : undefined}
                       >
-                        <div className="participant-info-editor">
-                          {participant?.photoURL ? (
-                            <img src={participant.photoURL} alt={participant.username} className="participant-photo-small" />
-                          ) : (
-                            <div className="participant-photo-placeholder-small">
-                              {participant?.username?.charAt(0).toUpperCase() || '?'}
-                            </div>
-                          )}
-                          <span>{participant?.username || participantId}</span>
-                        </div>
-                        {isWinner && (
-                          <Trophy size={18} className="trophy-icon-editor" />
-                        )}
-                        {isSelectable && (
-                          <button className="btn-select-winner" title="Hacer clic para establecer como ganador">
-                            <Trophy size={16} />
-                          </button>
+                        {pData[pid]?.photoURL
+                          ? <img src={pData[pid].photoURL} alt="" className="editor-p-photo" />
+                          : <div className="editor-p-placeholder">{(getName(pid) || '?')[0].toUpperCase()}</div>
+                        }
+                        <span className="editor-p-name">{getName(pid)}</span>
+                        {isWinner && <Trophy size={14} style={{ color: 'var(--gold-primary)', marginLeft: 'auto', flexShrink: 0 }} />}
+                        {selectable && !isWinner && (
+                          <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--text-muted)', flexShrink: 0 }}>→</span>
                         )}
                       </div>
                     );
                   })}
                 </div>
-                {!isCompleted && match.status === 'pending' && (
-                  <div className="match-hint">
-                    Haz clic en un participante para establecerlo como ganador
-                  </div>
+
+                {!done && match.status === 'pending' && (
+                  <p style={{ padding: '6px 12px', fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>
+                    Clic en un participante para marcarlo ganador
+                  </p>
                 )}
               </div>
             );
           })}
-        </div>
-      ) : (
-        <div className="no-brackets">
-          <p>No hay brackets creados. Genera brackets automáticamente o créalos manualmente.</p>
-          <button onClick={handleGenerateBrackets} className="btn-generate">
-            <Shuffle size={18} />
-            Generar Brackets
-          </button>
         </div>
       )}
     </div>

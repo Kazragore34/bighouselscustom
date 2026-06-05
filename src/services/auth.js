@@ -75,9 +75,9 @@ export const createUser = async (userData) => {
     const newUserRef = doc(collection(db, 'users'));
     await setDoc(newUserRef, {
       username,
-      name: name || username, // Nombre de la persona (puede ser diferente al username)
+      name: name || username,
       password: hashedPassword,
-      userType: userType || 'SOLO_VISUALIZAR',
+      userType: userType || 'PENDIENTE_VERIFICACION',
       email: email || '',
       photoURL: '',
       enabled,
@@ -133,11 +133,11 @@ export const loginWithGoogle = async () => {
         name: googleUser.displayName || googleUser.email.split('@')[0],
         email: googleUser.email,
         photoURL: googleUser.photoURL || '',
-        userType: 'SOLO_VISUALIZAR',
+        userType: 'PENDIENTE_VERIFICACION',
         enabled: true,
         badges: [],
         createdAt: serverTimestamp(),
-        googleAuth: true // Marcar que viene de Google
+        googleAuth: true
       };
       
       await setDoc(newUserRef, newUser);

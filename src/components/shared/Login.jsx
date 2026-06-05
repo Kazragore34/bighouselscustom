@@ -16,7 +16,6 @@ const Login = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       await login(username, password);
       navigate('/dashboard');
@@ -30,7 +29,6 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
-
     try {
       await loginGoogle();
       navigate('/dashboard');
@@ -46,15 +44,27 @@ const Login = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="logo-container">
-            <div className="gta-logo">⭐</div>
-            <h1>Los Santos Custom</h1>
+            <span className="brand-icon-large">◈</span>
+            <span className="brand-name-large">VANTAGE</span>
           </div>
-          <p>Sistema de Apuestas</p>
+          <p>Plataforma de Apuestas</p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="error-message">{error}</div>}
-          
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="google-button"
+          >
+            <Chrome size={18} />
+            Continuar con Google
+          </button>
+
+          <div className="divider"><span>O</span></div>
+
           <div className="form-group">
             <label htmlFor="username">Usuario</label>
             <input
@@ -63,7 +73,8 @@ const Login = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              placeholder="Ingresa tu usuario"
+              placeholder="Tu nombre de usuario"
+              autoComplete="username"
             />
           </div>
 
@@ -75,7 +86,8 @@ const Login = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="Ingresa tu contraseña"
+              placeholder="Tu contraseña"
+              autoComplete="current-password"
             />
           </div>
 
@@ -83,22 +95,8 @@ const Login = () => {
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
 
-          <div className="divider">
-            <span>O</span>
-          </div>
-
-          <button 
-            type="button" 
-            onClick={handleGoogleLogin} 
-            disabled={loading}
-            className="google-button"
-          >
-            <Chrome size={20} />
-            Continuar con Google
-          </button>
-
           <div className="signup-link">
-            <p>¿No tienes cuenta? <Link to="/signup">Regístrate aquí</Link></p>
+            <p>¿Sin cuenta? <Link to="/signup">Regístrate aquí</Link></p>
           </div>
         </form>
       </div>

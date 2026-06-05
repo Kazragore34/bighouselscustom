@@ -14,39 +14,33 @@ import UserManagement from './components/admin/UserManagement';
 import EventManagement from './components/admin/EventManagement';
 import BetConfirmation from './components/admin/BetConfirmation';
 import BracketEditor from './components/admin/BracketEditor';
+import HomePublic from './components/public/HomePublic';
 import './App.css';
 
+// Ruta que requiere login
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-
-  if (loading) {
-    return <div className="loading-screen">Cargando...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (loading) return <div className="loading-screen">◈ VANTAGE</div>;
+  if (!user) return <Navigate to="/" replace />;
   return children;
 };
 
+// Ruta que requiere admin
 const AdminRoute = ({ children }) => {
   const { user, isAdmin, loading } = useAuth();
-
-  if (loading) {
-    return <div className="loading-screen">Cargando...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
+  if (loading) return <div className="loading-screen">◈ VANTAGE</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return children;
 };
+
+// Layout con navbar
+const WithNav = ({ children }) => (
+  <>
+    <Navbar />
+    {children}
+  </>
+);
 
 function App() {
   const { user } = useAuth();
@@ -54,120 +48,43 @@ function App() {
   return (
     <div className="app">
       <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" replace />} />
-        <Route path="/signup" element={!user ? <SignUp /> : <Navigate to="/dashboard" replace />} />
-        
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+        {/* Público */}
+        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <HomePublic />} />
+        <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+        <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <SignUp />} />
 
-        <Route
-          path="/events"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <EventSelector />
-            </ProtectedRoute>
-          }
-        />
+        {/* Usuario logado */}
+        <Route path="/dashboard" element={<ProtectedRoute><WithNav><Dashboard /></WithNav></ProtectedRoute>} />
+        <Route path="/events" element={<ProtectedRoute><WithNav><EventSelector /></WithNav></ProtectedRoute>} />
+        <Route path="/events/:eventId" element={<ProtectedRoute><WithNav><VoteBetPanel /></WithNav></ProtectedRoute>} />
+        <Route path="/events/:eventId/brackets" element={<ProtectedRoute><WithNav><BracketViewer /></WithNav></ProtectedRoute>} />
+        <Route path="/ganadores" element={<ProtectedRoute><WithNav><Winners /></WithNav></ProtectedRoute>} />
+        {/* alias legacy */}
+        <Route path="/winners" element={<Navigate to="/ganadores" replace />} />
+        <Route path="/equipos" element={<ProtectedRoute><WithNav><TeamManagement /></WithNav></ProtectedRoute>} />
+        {/* alias legacy */}
+        <Route path="/teams" element={<Navigate to="/equipos" replace />} />
+        <Route path="/perfil" element={<ProtectedRoute><WithNav><Profile /></WithNav></ProtectedRoute>} />
+        {/* alias legacy */}
+        <Route path="/profile" element={<Navigate to="/perfil" replace />} />
 
-        <Route
-          path="/events/:eventId"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <VoteBetPanel />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/events/:eventId/brackets"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <BracketViewer />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/winners"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Winners />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/teams"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <TeamManagement />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/users"
-          element={
-            <AdminRoute>
-              <Navbar />
-              <UserManagement />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/events"
-          element={
-            <AdminRoute>
-              <Navbar />
-              <EventManagement />
-            </AdminRoute>
-          }
-        />
-
-        <Route
-          path="/admin/bets"
-          element={
-            <AdminRoute>
-              <Navbar />
-              <BetConfirmation />
-            </AdminRoute>
-          }
-        />
-
+        {/* Admin */}
+        <Route path="/admin/usuarios" element={<AdminRoute><WithNav><UserManagement /></WithNav></AdminRoute>} />
+        {/* alias legacy */}
+        <Route path="/admin/users" element={<Navigate to="/admin/usuarios" replace />} />
+        <Route path="/admin/eventos" element={<AdminRoute><WithNav><EventManagement /></WithNav></AdminRoute>} />
+        {/* alias legacy */}
+        <Route path="/admin/events" element={<Navigate to="/admin/eventos" replace />} />
+        <Route path="/admin/apuestas" element={<AdminRoute><WithNav><BetConfirmation /></WithNav></AdminRoute>} />
+        {/* alias legacy */}
+        <Route path="/admin/bets" element={<Navigate to="/admin/apuestas" replace />} />
         <Route
           path="/admin/events/:eventId/brackets"
-          element={
-            <AdminRoute>
-              <Navbar />
-              <BracketEditor />
-            </AdminRoute>
-          }
+          element={<AdminRoute><WithNav><BracketEditor /></WithNav></AdminRoute>}
         />
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );

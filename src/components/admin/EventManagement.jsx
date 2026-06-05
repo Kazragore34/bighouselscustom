@@ -1,77 +1,115 @@
 import { useState, useEffect } from 'react';
-import { getAllEvents, createEvent, updateEvent, deleteEvent, getEventParticipants, addParticipantsToEvent, closeParticipantsList, getEventById } from '../../services/events';
+import { useNavigate } from 'react-router-dom';
+import {
+  getAllEvents, createEvent, updateEvent, deleteEvent,
+  getEventParticipants, addParticipantsToEvent, closeParticipantsList,
+  getEventById, setEventWinner
+} from '../../services/events';
 import { generateSmartBrackets } from '../../services/brackets';
 import { getAllUsers, getUserById } from '../../services/users';
 import { getBetsByEvent } from '../../services/bets';
 import { fileToBase64 } from '../../utils/imageUtils';
-import { Plus, Edit, Trash2, Upload, Users, UserPlus, X, Trophy } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Trophy, X, Lock } from 'lucide-react';
 import ParticipantsModal from './ParticipantsModal';
+import './admin-shared.css';
 import './EventManagement.css';
 
+const EVENT_TYPES = [
+  { value: 'CARRERA_COCHES', label: '🚗 Carrera de Coches' },
+  { value: 'PELEA_COMBATE', label: '🥊 Pelea / Combate' },
+  { value: 'DISPAROS', label: '🎯 Disparos' },
+  { value: 'CARRERA_PIE', label: '🏃 Carrera a Pie / Parkour' },
+  { value: 'POSTA_EQUIPOS', label: '🏁 Posta por Equipos' },
+  { value: 'ROL_LIBRE', label: '🎭 Rol Libre' },
+];
+
+const COMPETITION_MODES = [
+  { value: 'CARRERA_CLASICA', label: 'A — Carrera Clásica (posiciones finales)' },
+  { value: 'ELIMINACION_PROGRESIVA', label: 'B — Eliminación Progresiva (rondas con eliminados)' },
+  { value: 'BRACKET_TORNEO', label: 'C — Bracket Torneo (eliminación directa 1v1)' },
+  { value: 'MULTI_FASE', label: 'D — Multi-Fase (clasificatorias + final)' },
+  { value: 'RONDAS_INDEPENDIENTES', label: 'E — Rondas Independientes (ej. carros chocones)' },
+];
+
+const STATUSES = [
+  { value: 'BORRADOR', label: 'Borrador' },
+  { value: 'draft', label: 'Borrador (legacy)' },
+  { value: 'ACTIVO', label: 'Activo' },
+  { value: 'active', label: 'Activo (legacy)' },
+  { value: 'EN_CURSO', label: 'En Curso' },
+  { value: 'POSPUESTO', label: 'Pospuesto' },
+  { value: 'FINALIZADO', label: 'Finalizado' },
+  { value: 'finished', label: 'Finalizado (legacy)' },
+  { value: 'CANCELADO', label: 'Cancelado' },
+];
+
+const STATUS_LABEL = {
+  BORRADOR: 'Borrador', draft: 'Borrador',
+  ACTIVO: 'Activo', active: 'Activo',
+  EN_CURSO: 'En Curso',
+  POSPUESTO: 'Pospuesto',
+  FINALIZADO: 'Finalizado', finished: 'Finalizado',
+  CANCELADO: 'Cancelado', cancelled: 'Cancelado',
+};
+
+const EMPTY_FORM = {
+  name: '',
+  description: '',
+  eventType: 'CARRERA_COCHES',
+  competitionMode: 'BRACKET_TORNEO',
+  isTeamEvent: false,
+  teamSize: 1,
+  status: 'BORRADOR',
+  bannerURL: '',
+  bannerFile: null,
+  betDeadline: '',
+  maxBetPerUser: 0,
+  commissionPercent: 10,
+  totalWinners: 1,
+  maxRounds: 5,
+  totalPhases: 2,
+  // legacy compat
+  houseCommission: 10,
+  participantsPerBracket: 2,
+};
+
 const EventManagement = () => {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    eventType: 'race',
-    bracketType: '1v1',
-    participantsPerBracket: 2,
-    houseCommission: 10,
-    icon: 'trophy',
-    status: 'draft',
-    bannerURL: '',
-    bannerFile: null,
-    betDeadline: '', // Fecha/hora límite para apostar/votar
-    startDate: '',
-    endDate: '',
-    maxBetPerUser: 0 // 0 = sin límite, >0 = límite máximo por usuario
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [eventParticipants, setEventParticipants] = useState([]);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [currentEventForParticipants, setCurrentEventForParticipants] = useState(null);
-  const [eventTotals, setEventTotals] = useState({}); // { eventId: { totalBets: number, confirmedBetsCount: number, pendingBetsCount: number } }
+  const [eventTotals, setEventTotals] = useState({});
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [eventsData, usersData] = await Promise.all([
-        getAllEvents(),
-        getAllUsers()
-      ]);
+      const [eventsData, usersData] = await Promise.all([getAllEvents(), getAllUsers()]);
       setEvents(eventsData);
-      // Mostrar solo usuarios PARTICIPANTE para agregar como participantes del evento
-      // VOTANTE_APOSTADOR puede votar/apostar pero NO aparece en la lista de participantes
-      setUsers(usersData.filter(u => u.enabled && u.userType === 'PARTICIPANTE'));
-      
-      // Cargar totales de apuestas para cada evento
+      // Participantes = usuarios con rol PARTICIPANTE o APOSTADOR (no PENDIENTE)
+      setUsers(usersData.filter(u => u.enabled !== false && ['PARTICIPANTE', 'APOSTADOR', 'VOTANTE_APOSTADOR', 'ADMIN'].includes(u.userType || u.role)));
+
       const totals = {};
-      for (const event of eventsData) {
+      for (const ev of eventsData) {
         try {
-          const bets = await getBetsByEvent(event.id);
-          const confirmedBets = bets.filter(b => b.status === 'confirmed');
-          const totalBets = confirmedBets.reduce((sum, bet) => sum + (bet.amount || 0), 0);
-          totals[event.id] = {
-            totalBets,
-            confirmedBetsCount: confirmedBets.length,
-            pendingBetsCount: bets.filter(b => b.status === 'pending').length
+          const bets = await getBetsByEvent(ev.id);
+          const confirmed = bets.filter(b => b.status === 'confirmed');
+          totals[ev.id] = {
+            totalBets: confirmed.reduce((s, b) => s + (b.amount || 0), 0),
+            confirmedCount: confirmed.length,
+            pendingCount: bets.filter(b => b.status === 'pending').length,
           };
-          console.log(`Evento ${event.name} (${event.id}): Bote total = $${totalBets.toFixed(2)}, ${confirmedBets.length} apuestas confirmadas`);
-        } catch (error) {
-          console.error(`Error cargando apuestas para evento ${event.id}:`, error);
-          totals[event.id] = { totalBets: 0, confirmedBetsCount: 0, pendingBetsCount: 0 };
-        }
+        } catch { totals[ev.id] = { totalBets: 0, confirmedCount: 0, pendingCount: 0 }; }
       }
-      console.log('Totales de botes cargados:', totals);
       setEventTotals(totals);
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -82,50 +120,24 @@ const EventManagement = () => {
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      // Validar tamaño (máximo 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        alert('La imagen es muy grande. Máximo 2MB.');
-        return;
-      }
-      
-      try {
-        setUploading(true);
-        // Convertir a base64
-        const base64 = await fileToBase64(file);
-        setFormData({ ...formData, bannerURL: base64, bannerFile: file });
-      } catch (error) {
-        alert('Error al procesar la imagen');
-      } finally {
-        setUploading(false);
-      }
-    }
-  };
-
-  const handleUrlChange = (e) => {
-    setFormData({ ...formData, bannerURL: e.target.value, bannerFile: null });
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert('Imagen demasiado grande (máx 2MB)'); return; }
+    try {
+      setUploading(true);
+      const base64 = await fileToBase64(file);
+      setFormData(f => ({ ...f, bannerURL: base64, bannerFile: file }));
+    } catch { alert('Error procesando imagen'); }
+    finally { setUploading(false); }
   };
 
   const handleCreateEvent = async () => {
     try {
-      if (!formData.bannerURL) {
-        if (!confirm('¿Crear evento sin banner?')) {
-          return;
-        }
-      }
-
-      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined ni null)
-      const { bannerFile, ...eventData } = formData;
-      // Asegurarse de que bannerFile no esté en el objeto
-      delete eventData.bannerFile;
-      const eventId = await createEvent(eventData);
-
-      // Agregar participantes si se seleccionaron
-      if (selectedParticipants.length > 0) {
-        await addParticipantsToEvent(eventId, selectedParticipants);
-      }
-
-      alert('Evento creado exitosamente');
+      if (!formData.name) { alert('El nombre del evento es obligatorio'); return; }
+      const { bannerFile, ...data } = formData;
+      // Mantener compatibilidad con campos legacy
+      data.houseCommission = data.commissionPercent;
+      const eventId = await createEvent(data);
+      if (selectedParticipants.length > 0) await addParticipantsToEvent(eventId, selectedParticipants);
       setShowModal(false);
       resetForm();
       loadData();
@@ -137,122 +149,40 @@ const EventManagement = () => {
   const handleEditEvent = async (event) => {
     setEditingEvent(event);
     setFormData({
-      name: event.name,
+      name: event.name || '',
       description: event.description || '',
-      eventType: event.eventType || 'race',
-      bracketType: event.bracketType || '1v1',
-      participantsPerBracket: event.participantsPerBracket || 2,
-      houseCommission: event.houseCommission || 10,
-      icon: event.icon || 'trophy',
-      status: event.status || 'draft',
+      eventType: event.eventType || 'CARRERA_COCHES',
+      competitionMode: event.competitionMode || (event.bracketType === '1v1' ? 'BRACKET_TORNEO' : 'CARRERA_CLASICA'),
+      isTeamEvent: event.isTeamEvent || false,
+      teamSize: event.teamSize || 1,
+      status: event.status || 'BORRADOR',
       bannerURL: event.bannerURL || '',
       bannerFile: null,
       betDeadline: event.betDeadline || '',
-      startDate: event.startDate || '',
-      endDate: event.endDate || '',
-      maxBetPerUser: event.maxBetPerUser || 0
+      maxBetPerUser: event.maxBetPerUser || 0,
+      commissionPercent: event.commissionPercent || event.houseCommission || 10,
+      totalWinners: event.totalWinners || 1,
+      maxRounds: event.maxRounds || 5,
+      totalPhases: event.totalPhases || 2,
+      houseCommission: event.houseCommission || 10,
+      participantsPerBracket: event.participantsPerBracket || 2,
     });
-    
-    // Cargar participantes del evento
     try {
-      const participants = await getEventParticipants(event.id);
-      const participantsWithData = await Promise.all(
-        participants.map(async (p) => {
-          const userData = await getUserById(p.userId);
-          return { ...p, ...userData };
-        })
-      );
-      setEventParticipants(participantsWithData);
-    } catch (error) {
-      console.error('Error cargando participantes:', error);
-      setEventParticipants([]);
-    }
-    
+      const parts = await getEventParticipants(event.id);
+      const withData = await Promise.all(parts.map(async p => {
+        try { return { ...p, ...await getUserById(p.userId) }; }
+        catch { return { ...p, username: p.userId }; }
+      }));
+      setEventParticipants(withData);
+    } catch { setEventParticipants([]); }
     setShowModal(true);
-  };
-
-  const handleSetWinner = async (event) => {
-    try {
-      const eventData = await getEventById(event.id);
-      const participants = await getEventParticipants(event.id);
-      const participantsWithData = await Promise.all(
-        participants.map(async (p) => {
-          try {
-            const userData = await getUserById(p.userId);
-            return { ...p, ...userData };
-          } catch (err) {
-            return { ...p, username: 'Usuario no encontrado' };
-          }
-        })
-      );
-
-      const isTeamEvent = event.bracketType === '2v2' || event.bracketType === 'custom';
-      
-      if (isTeamEvent) {
-        // Para eventos por equipos, mostrar equipos
-        const teams = {};
-        participantsWithData.forEach(p => {
-          if (p.teamId) {
-            if (!teams[p.teamId]) {
-              teams[p.teamId] = [];
-            }
-            teams[p.teamId].push(p);
-          }
-        });
-
-        const teamOptions = Object.entries(teams).map(([teamId, members]) => ({
-          id: teamId,
-          name: `Equipo ${teamId}`,
-          members: members.map(m => m.username).join(', ')
-        }));
-
-        const selectedTeam = prompt(
-          `Equipos disponibles:\n${teamOptions.map((t, i) => `${i + 1}. ${t.name} (${t.members})`).join('\n')}\n\nIngresa el número del equipo ganador:`
-        );
-
-        if (selectedTeam) {
-          const teamIndex = parseInt(selectedTeam) - 1;
-          if (teamIndex >= 0 && teamIndex < teamOptions.length) {
-            await setEventWinner(event.id, null, teamOptions[teamIndex].id);
-            alert('Ganador establecido exitosamente');
-            loadData();
-          }
-        }
-      } else {
-        // Para eventos individuales
-        const participantOptions = participantsWithData.map((p, i) => ({
-          id: p.userId,
-          name: p.username || 'Usuario desconocido',
-          index: i + 1
-        }));
-
-        const selected = prompt(
-          `Participantes disponibles:\n${participantOptions.map(p => `${p.index}. ${p.name}`).join('\n')}\n\nIngresa el número del ganador:`
-        );
-
-        if (selected) {
-          const participantIndex = parseInt(selected) - 1;
-          if (participantIndex >= 0 && participantIndex < participantOptions.length) {
-            await setEventWinner(event.id, participantOptions[participantIndex].id, null);
-            alert('Ganador establecido exitosamente');
-            loadData();
-          }
-        }
-      }
-    } catch (error) {
-      alert('Error al establecer ganador: ' + error.message);
-    }
   };
 
   const handleUpdateEvent = async () => {
     try {
-      // Eliminar bannerFile del objeto antes de enviar (Firestore no acepta undefined ni null)
-      const { bannerFile, ...eventData } = formData;
-      // Asegurarse de que bannerFile no esté en el objeto
-      delete eventData.bannerFile;
-      await updateEvent(editingEvent.id, eventData);
-
-      alert('Evento actualizado exitosamente');
+      const { bannerFile, ...data } = formData;
+      data.houseCommission = data.commissionPercent;
+      await updateEvent(editingEvent.id, data);
       setShowModal(false);
       resetForm();
       loadData();
@@ -262,436 +192,313 @@ const EventManagement = () => {
   };
 
   const handleDeleteEvent = async (eventId) => {
-    if (!confirm('¿Está seguro de eliminar este evento? Esto eliminará también todos los participantes, votos, apuestas y brackets asociados.')) {
-      return;
-    }
-
+    if (!confirm('¿Eliminar este evento? Se eliminarán también participantes, apuestas y brackets.')) return;
     try {
       await deleteEvent(eventId);
-      alert('Evento eliminado exitosamente');
       loadData();
     } catch (error) {
-      console.error('Error completo al eliminar evento:', error);
-      alert('Error al eliminar evento: ' + (error.message || 'Error desconocido. Verifica la consola para más detalles.'));
+      alert('Error al eliminar: ' + error.message);
+    }
+  };
+
+  const handleGenerateBracket = async (event) => {
+    if (!confirm('¿Generar bracket oficial? Esto sobreescribirá cualquier bracket existente y será visible para todos los usuarios.')) return;
+    try {
+      const parts = await getEventParticipants(event.id);
+      const withData = await Promise.all(parts.map(async p => {
+        try { return { ...p, ...await getUserById(p.userId) }; }
+        catch { return { ...p, username: p.userId }; }
+      }));
+      await closeParticipantsList(event.id);
+      await generateSmartBrackets(event.id, withData, event.bracketType || '1v1', event.participantsPerBracket || 2);
+      alert('Bracket generado y guardado en Firestore. Todos los usuarios verán la misma estructura.');
+      loadData();
+    } catch (error) {
+      alert('Error generando bracket: ' + error.message);
+    }
+  };
+
+  const handleSetWinner = async (event) => {
+    try {
+      const parts = await getEventParticipants(event.id);
+      const withData = await Promise.all(parts.map(async p => {
+        try { return { ...p, ...await getUserById(p.userId) }; }
+        catch { return { ...p, username: 'Desconocido' }; }
+      }));
+      const opts = withData.map((p, i) => `${i + 1}. ${p.username || p.name}`).join('\n');
+      const sel = prompt(`Selecciona el ganador:\n${opts}\n\nIngresa el número:`);
+      if (!sel) return;
+      const idx = parseInt(sel) - 1;
+      if (idx >= 0 && idx < withData.length) {
+        await setEventWinner(event.id, withData[idx].userId, null);
+        alert('Ganador establecido');
+        loadData();
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
     }
   };
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      eventType: 'race',
-      bracketType: '1v1',
-      participantsPerBracket: 2,
-      houseCommission: 10,
-      icon: 'trophy',
-      status: 'draft',
-      bannerURL: '',
-      bannerFile: null,
-      betDeadline: '',
-      startDate: '',
-      endDate: '',
-      maxBetPerUser: 0
-    });
+    setFormData(EMPTY_FORM);
     setSelectedParticipants([]);
     setEditingEvent(null);
   };
 
-  if (loading) {
-    return <div className="loading">Cargando eventos...</div>;
-  }
+  const set = (field, value) => setFormData(f => ({ ...f, [field]: value }));
+
+  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando eventos...</div>;
 
   return (
-    <div className="event-management">
-      <div className="page-header">
-        <h1>Gestión de Eventos</h1>
+    <div className="admin-page">
+      <div className="admin-page-header">
+        <h1>Gestión de <span>Eventos</span></h1>
         <button onClick={() => { resetForm(); setShowModal(true); }} className="btn-add">
-          <Plus size={20} />
-          Crear Evento
+          <Plus size={16} /> Crear Evento
         </button>
       </div>
 
-      <div className="events-list">
-        {events.map(event => (
-          <div key={event.id} className="event-card">
-            {event.bannerURL && (
-              <div className="event-banner" style={{ backgroundImage: `url(${event.bannerURL})` }} />
-            )}
-            <div className="event-content">
-              <h3>{event.name}</h3>
-              <p>{event.description || 'Sin descripción'}</p>
-              <div className="event-meta">
-                <span className="badge badge-type">{event.eventType}</span>
-                <span className="badge badge-status">{event.status}</span>
-                <span className="badge badge-commission">Comisión: {event.houseCommission}%</span>
-                <span className="badge badge-pot" title={eventTotals[event.id] ? `Bote total: $${eventTotals[event.id].totalBets.toFixed(2)} | ${eventTotals[event.id].confirmedBetsCount} apuestas confirmadas | ${eventTotals[event.id].pendingBetsCount} pendientes` : 'Cargando bote...'}>
-                  💰 Bote: ${eventTotals[event.id] ? eventTotals[event.id].totalBets.toFixed(2) : '0.00'}
-                </span>
-              </div>
-              <div className="event-actions" onClick={(e) => e.stopPropagation()}>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    handleEditEvent(event);
-                  }} 
-                  className="btn-edit"
-                >
-                  <Edit size={16} />
-                  Editar
-                </button>
-                <button 
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    try {
-                      console.log('Cargando participantes para evento:', event.id);
-                      const participants = await getEventParticipants(event.id);
-                      console.log('Participantes encontrados:', participants);
-                      const participantsWithData = await Promise.all(
-                        participants.map(async (p) => {
-                          try {
-                            const userData = await getUserById(p.userId);
-                            return { ...p, ...userData };
-                          } catch (err) {
-                            console.error('Error cargando usuario:', p.userId, err);
-                            return { ...p, username: 'Usuario no encontrado', name: 'Usuario no encontrado' };
-                          }
-                        })
-                      );
-                      console.log('Participantes con datos:', participantsWithData);
-                      setEventParticipants(participantsWithData);
+      <div className="events-admin-grid">
+        {events.map(event => {
+          const tot = eventTotals[event.id];
+          const statusLabel = STATUS_LABEL[event.status] || event.status;
+          return (
+            <div key={event.id} className="event-admin-card">
+              {event.bannerURL && (
+                <div className="event-admin-banner" style={{ backgroundImage: `url(${event.bannerURL})` }} />
+              )}
+              <div className="event-admin-body">
+                <div className="event-admin-meta">
+                  <span className={`status-badge status-${event.status}`}>{statusLabel}</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    {event.competitionMode || event.bracketType || '—'}
+                  </span>
+                </div>
+                <h3 className="event-admin-title">{event.name}</h3>
+                {event.description && <p className="event-admin-desc">{event.description}</p>}
+                <div className="event-admin-stats">
+                  <span>💰 ${tot?.totalBets?.toFixed(0) || '0'}</span>
+                  <span>✓ {tot?.confirmedCount || 0} confirmadas</span>
+                  <span>⏳ {tot?.pendingCount || 0} pendientes</span>
+                </div>
+                <div className="table-actions" style={{ flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+                  <button className="btn-table-action btn-table-edit" onClick={() => handleEditEvent(event)}>
+                    <Edit size={12} /> Editar
+                  </button>
+                  <button
+                    className="btn-table-action btn-table-neutral"
+                    onClick={async () => {
+                      const parts = await getEventParticipants(event.id).catch(() => []);
+                      const withData = await Promise.all(parts.map(async p => {
+                        try { return { ...p, ...await getUserById(p.userId) }; }
+                        catch { return { ...p, username: p.userId }; }
+                      }));
+                      setEventParticipants(withData);
                       setCurrentEventForParticipants(event);
                       setShowParticipantsModal(true);
-                      console.log('Modal de participantes abierto');
-                    } catch (error) {
-                      console.error('Error completo:', error);
-                      alert('Error cargando participantes: ' + error.message);
-                    }
-                  }}
-                  className="btn-participants"
-                  title="Gestionar participantes"
-                >
-                  <Users size={16} />
-                  Participantes
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    window.location.href = `/admin/events/${event.id}/brackets`;
-                  }}
-                  className="btn-brackets"
-                  title="Editar brackets"
-                >
-                  <Trophy size={16} />
-                  Brackets
-                </button>
-                {(event.status === 'active' || event.status === 'completed') && (
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      await handleSetWinner(event);
                     }}
-                    className="btn-winner"
-                    title="Establecer ganador final"
                   >
-                    <Trophy size={16} />
-                    Ganador
+                    <Users size={12} /> Participantes
                   </button>
-                )}
-                {!event.participantsListClosed && (
                   <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      if (!confirm('¿Cerrar lista de participantes y generar bracket final? Esto creará el bracket oficial basado en votos y apuestas actuales. Ya no se podrán agregar más participantes.')) {
-                        return;
-                      }
-                      try {
-                        // Cerrar lista
-                        await closeParticipantsList(event.id);
-                        
-                        // Obtener participantes y generar bracket final
-                        const participants = await getEventParticipants(event.id);
-                        const participantsWithData = await Promise.all(
-                          participants.map(async (p) => {
-                            try {
-                              const userData = await getUserById(p.userId);
-                              return { ...p, ...userData };
-                            } catch (err) {
-                              return { ...p, username: p.userId };
-                            }
-                          })
-                        );
-                        
-                        const bracketType = event.bracketType || '1v1';
-                        const participantsPerBracket = event.participantsPerBracket || 2;
-                        
-                        await generateSmartBrackets(event.id, participantsWithData, bracketType, participantsPerBracket);
-                        alert('Lista cerrada y bracket final generado exitosamente');
-                        loadData();
-                      } catch (error) {
-                        console.error('Error cerrando lista:', error);
-                        alert('Error: ' + error.message);
-                      }
-                    }}
-                    className="btn-close-list"
-                    title="Cerrar lista de participantes y generar bracket final"
+                    className="btn-table-action btn-table-neutral"
+                    onClick={() => navigate(`/admin/events/${event.id}/brackets`)}
                   >
-                    <X size={16} />
-                    Cerrar Lista
+                    <Trophy size={12} /> Brackets
                   </button>
-                )}
-                {event.participantsListClosed && (
-                  <span className="badge badge-closed" title="Lista de participantes cerrada">
-                    Lista Cerrada
-                  </span>
-                )}
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    handleDeleteEvent(event.id);
-                  }} 
-                  className="btn-delete"
-                >
-                  <Trash2 size={16} />
-                  Eliminar
-                </button>
+                  {!event.participantsListClosed && (
+                    <button className="btn-table-action btn-table-success" onClick={() => handleGenerateBracket(event)}>
+                      <Lock size={12} /> Generar Bracket
+                    </button>
+                  )}
+                  {(event.status === 'active' || event.status === 'ACTIVO' || event.status === 'EN_CURSO') && (
+                    <button className="btn-table-action btn-table-success" onClick={() => handleSetWinner(event)}>
+                      <Trophy size={12} /> Ganador
+                    </button>
+                  )}
+                  <button className="btn-table-action btn-table-danger" onClick={() => handleDeleteEvent(event.id)}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => { setShowModal(false); resetForm(); }}>
-          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingEvent ? 'Editar Evento' : 'Crear Evento'}</h2>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label>Nombre del Evento</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
+      {events.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+          No hay eventos. Crea el primero.
+        </div>
+      )}
 
-              <div className="form-group">
-                <label>Tipo de Evento</label>
-                <select
-                  value={formData.eventType}
-                  onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
-                >
-                  <option value="race">Carrera</option>
-                  <option value="fight">Pelea</option>
-                  <option value="competition">Competencia</option>
-                  <option value="other">Otro</option>
-                </select>
-              </div>
+      {/* Modal de creación/edición */}
+      {showModal && (
+        <div className="admin-modal-overlay" onClick={() => { setShowModal(false); resetForm(); }}>
+          <div className="admin-modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+            <h2>{editingEvent ? 'Editar Evento' : 'Crear Evento'}</h2>
+
+            {/* Sección 1 — Info básica */}
+            <div style={{ marginBottom: 6, fontSize: '0.75rem', color: 'var(--gold-primary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Información Básica</div>
+
+            <div className="form-group">
+              <label>Nombre del Evento *</label>
+              <input type="text" value={formData.name} onChange={e => set('name', e.target.value)} placeholder="Nombre del evento" />
             </div>
 
             <div className="form-group">
               <label>Descripción</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows="3"
-              />
+              <textarea value={formData.description} onChange={e => set('description', e.target.value)} rows={2} placeholder="Descripción breve" />
             </div>
 
-            <div className="form-row">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group">
-                <label>Tipo de Bracket</label>
-                <select
-                  value={formData.bracketType}
-                  onChange={(e) => setFormData({ ...formData, bracketType: e.target.value })}
-                >
-                  <option value="1v1">1 vs 1</option>
-                  <option value="2v2">2 vs 2</option>
-                  <option value="10x10">10x10</option>
-                  <option value="custom">Personalizado</option>
+                <label>Tipo de Evento</label>
+                <select value={formData.eventType} onChange={e => set('eventType', e.target.value)}>
+                  {EVENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
-
               <div className="form-group">
-                <label>Participantes por Bracket</label>
-                <input
-                  type="number"
-                  value={formData.participantsPerBracket}
-                  onChange={(e) => setFormData({ ...formData, participantsPerBracket: parseInt(e.target.value) })}
-                  min="2"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Icono</label>
-                <select
-                  value={formData.icon}
-                  onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                >
-                  <option value="car">Carro</option>
-                  <option value="boxing">Box</option>
-                  <option value="running">Corriendo</option>
-                  <option value="search">Búsqueda</option>
-                  <option value="trophy">Trofeo</option>
+                <label>Estado</label>
+                <select value={formData.status} onChange={e => set('status', e.target.value)}>
+                  {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
-
-              <div className="form-group">
-                <label>Comisión de la Casa (%)</label>
-                <input
-                  type="number"
-                  value={formData.houseCommission}
-                  onChange={(e) => setFormData({ ...formData, houseCommission: parseFloat(e.target.value) })}
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  required
-                />
-              </div>
             </div>
 
             <div className="form-group">
-              <label>Estado</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              >
-                <option value="draft">Borrador</option>
-                <option value="active">Activo</option>
-                <option value="finished">Finalizado</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Fecha/Hora Límite para Apostar/Votar</label>
-              <input
-                type="datetime-local"
-                value={formData.betDeadline || ''}
-                onChange={(e) => setFormData({ ...formData, betDeadline: e.target.value })}
-                placeholder="Fecha límite para apostar/votar"
-              />
-              <p className="help-text">⚠️ Después de esta fecha no se podrán realizar apuestas ni votos</p>
-            </div>
-
-            <div className="form-group">
-              <label>Límite Máximo de Apuesta por Usuario (Anti-Manipulación)</label>
-              <input
-                type="number"
-                value={formData.maxBetPerUser || ''}
-                onChange={(e) => setFormData({ ...formData, maxBetPerUser: parseFloat(e.target.value) || 0 })}
-                min="0"
-                step="0.01"
-                placeholder="0 = Sin límite"
-              />
-              <p className="help-text">💡 Establece un límite máximo que cada usuario puede apostar en total en este evento. 0 = sin límite. Esto ayuda a prevenir manipulación.</p>
-            </div>
-
-            <div className="form-group">
-              <label>Banner del Evento (URL o subir imagen)</label>
-              <div className="banner-input-group">
+              <label>Banner (URL externa — Imgur, ImgBB, etc.)</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   type="text"
                   value={formData.bannerURL}
-                  onChange={handleUrlChange}
-                  placeholder="Pega la URL de la imagen aquí"
-                  className="banner-url-input"
+                  onChange={e => set('bannerURL', e.target.value)}
+                  placeholder="https://i.imgur.com/..."
+                  style={{ flex: 1 }}
                 />
-                <span className="or-divider">O</span>
-                <div className="file-upload">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    disabled={uploading}
-                  />
-                  {formData.bannerFile && (
-                    <span className="file-name">✓ {formData.bannerFile.name}</span>
-                  )}
-                </div>
+                <label style={{ cursor: 'pointer', padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-gold)', color: 'var(--text-secondary)', borderRadius: 7, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                  {uploading ? '...' : 'Subir'}
+                  <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} style={{ display: 'none' }} />
+                </label>
               </div>
               {formData.bannerURL && (
-                <div className="banner-preview">
-                  <img src={formData.bannerURL} alt="Preview" />
-                </div>
+                <img src={formData.bannerURL} alt="preview" style={{ marginTop: 8, width: '100%', height: 100, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-gold)' }} onError={e => e.target.style.display = 'none'} />
               )}
-              <p className="help-text">
-                💡 Puedes usar una URL de imagen o subir una imagen (se convertirá a base64, máximo 2MB)
-              </p>
             </div>
 
-            {!editingEvent && (
+            {/* Sección 2 — Formato */}
+            <div style={{ marginBottom: 6, marginTop: 16, fontSize: '0.75rem', color: 'var(--gold-primary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Formato de Competencia</div>
+
+            <div className="form-group">
+              <label>Modo de Competencia</label>
+              <select value={formData.competitionMode} onChange={e => set('competitionMode', e.target.value)}>
+                {COMPETITION_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group">
-                <label>Participantes (opcional - se pueden agregar después)</label>
-                <div className="participants-selector">
-                  {users.map(user => (
-                    <label key={user.id} className="checkbox-label">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexDirection: 'row' }}>
+                  <input type="checkbox" checked={formData.isTeamEvent} onChange={e => set('isTeamEvent', e.target.checked)} style={{ width: 'auto', padding: 0 }} />
+                  <span>Evento por equipos</span>
+                </label>
+                {formData.isTeamEvent && (
+                  <select value={formData.teamSize} onChange={e => set('teamSize', parseInt(e.target.value))} style={{ marginTop: 6 }}>
+                    <option value={2}>2v2</option>
+                    <option value={3}>3v3</option>
+                    <option value={4}>4v4</option>
+                    <option value={1}>Personalizado</option>
+                  </select>
+                )}
+              </div>
+
+              {formData.competitionMode !== 'RONDAS_INDEPENDIENTES' && (
+                <div className="form-group">
+                  <label>Nº de Ganadores</label>
+                  <input type="number" min={1} value={formData.totalWinners} onChange={e => set('totalWinners', parseInt(e.target.value))} />
+                </div>
+              )}
+
+              {formData.competitionMode === 'RONDAS_INDEPENDIENTES' && (
+                <div className="form-group">
+                  <label>Rondas Máx. (estimado)</label>
+                  <input type="number" min={1} value={formData.maxRounds} onChange={e => set('maxRounds', parseInt(e.target.value))} />
+                </div>
+              )}
+
+              {formData.competitionMode === 'MULTI_FASE' && (
+                <div className="form-group">
+                  <label>Nº de Fases</label>
+                  <input type="number" min={2} value={formData.totalPhases} onChange={e => set('totalPhases', parseInt(e.target.value))} />
+                </div>
+              )}
+            </div>
+
+            {/* Sección 3 — Apuestas */}
+            <div style={{ marginBottom: 6, marginTop: 16, fontSize: '0.75rem', color: 'var(--gold-primary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Configuración de Apuestas</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label>Comisión casa (%)</label>
+                <input type="number" min={0} max={100} step={0.5} value={formData.commissionPercent} onChange={e => set('commissionPercent', parseFloat(e.target.value))} />
+              </div>
+              <div className="form-group">
+                <label>Límite máx. por usuario (0=sin límite)</label>
+                <input type="number" min={0} value={formData.maxBetPerUser} onChange={e => set('maxBetPerUser', parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Fecha/hora límite de apuestas</label>
+              <input type="datetime-local" value={formData.betDeadline || ''} onChange={e => set('betDeadline', e.target.value)} />
+            </div>
+
+            {/* Participantes en creación */}
+            {!editingEvent && users.length > 0 && (
+              <>
+                <div style={{ marginBottom: 6, marginTop: 16, fontSize: '0.75rem', color: 'var(--gold-primary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Participantes (opcional)</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, maxHeight: 140, overflowY: 'auto', padding: 8, background: 'var(--bg-secondary)', borderRadius: 7, border: '1px solid var(--border-gold)' }}>
+                  {users.map(u => (
+                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                       <input
                         type="checkbox"
-                        checked={selectedParticipants.includes(user.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedParticipants([...selectedParticipants, user.id]);
-                          } else {
-                            setSelectedParticipants(selectedParticipants.filter(id => id !== user.id));
-                          }
-                        }}
+                        checked={selectedParticipants.includes(u.id)}
+                        onChange={e => setSelectedParticipants(prev => e.target.checked ? [...prev, u.id] : prev.filter(id => id !== u.id))}
+                        style={{ width: 'auto', padding: 0 }}
                       />
-                      {user.username}
+                      {u.username}
                     </label>
                   ))}
                 </div>
-              </div>
+              </>
             )}
 
+            {/* Participantes en edición */}
             {editingEvent && (
-              <div className="form-group">
-                <label>Participantes del Evento</label>
-                <div className="current-participants">
-                  {eventParticipants.length === 0 ? (
-                    <p className="no-participants">No hay participantes agregados aún</p>
-                  ) : (
-                    <div className="participants-list">
-                      {eventParticipants.map(p => (
-                        <div key={p.id} className="participant-badge">
-                          <span>{p.username || p.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrentEventForParticipants(editingEvent);
-                      setShowParticipantsModal(true);
-                    }}
-                    className="btn-add-participants"
-                  >
-                    <UserPlus size={16} />
-                    {eventParticipants.length === 0 ? 'Agregar Participantes' : 'Gestionar Participantes'}
-                  </button>
+              <div className="form-group" style={{ marginTop: 16 }}>
+                <label>Participantes ({eventParticipants.length})</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {eventParticipants.map(p => (
+                    <span key={p.id} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-gold)', borderRadius: 20, padding: '2px 10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {p.username || p.name}
+                    </span>
+                  ))}
+                  {eventParticipants.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin participantes</span>}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => { setCurrentEventForParticipants(editingEvent); setShowParticipantsModal(true); }}
+                  className="btn-table-action btn-table-edit"
+                  style={{ padding: '7px 14px' }}
+                >
+                  <Users size={13} /> Gestionar Participantes
+                </button>
               </div>
             )}
 
-            <div className="modal-actions">
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="btn-cancel">
-                Cancelar
-              </button>
-              <button
-                onClick={editingEvent ? handleUpdateEvent : handleCreateEvent}
-                className="btn-save"
-                disabled={uploading}
-              >
+            <div className="admin-modal-footer">
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="btn-cancel">Cancelar</button>
+              <button onClick={editingEvent ? handleUpdateEvent : handleCreateEvent} className="btn-save" disabled={uploading}>
                 {uploading ? 'Subiendo...' : editingEvent ? 'Actualizar' : 'Crear'}
               </button>
             </div>
@@ -699,18 +506,11 @@ const EventManagement = () => {
         </div>
       )}
 
-      {/* Modal para gestionar participantes */}
       <ParticipantsModal
         event={currentEventForParticipants}
         isOpen={showParticipantsModal}
-        onClose={() => {
-          setShowParticipantsModal(false);
-          setCurrentEventForParticipants(null);
-          setSelectedParticipants([]);
-        }}
-        onUpdate={() => {
-          loadData();
-        }}
+        onClose={() => { setShowParticipantsModal(false); setCurrentEventForParticipants(null); setSelectedParticipants([]); }}
+        onUpdate={loadData}
       />
     </div>
   );

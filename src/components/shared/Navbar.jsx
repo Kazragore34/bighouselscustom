@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Bell, Check, X } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { LogOut, Bell, Check, X } from 'lucide-react';
 import { getPendingInvitations, acceptInvitation, rejectInvitation, getTeamById } from '../../services/teams';
 import { getUserById } from '../../services/users';
 import './Navbar.css';
 
-// Componente de notificaciones de invitaciones
+// Componente de logo de marca — cambiar aquí cuando haya SVG
+const BrandLogo = () => (
+  <div className="navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <span className="brand-icon">◈</span>
+    <span className="brand-name">VANTAGE</span>
+  </div>
+);
+
 const NotificationsWidget = () => {
   const { user } = useAuth();
   const [invitations, setInvitations] = useState([]);
@@ -16,7 +23,6 @@ const NotificationsWidget = () => {
   useEffect(() => {
     if (user) {
       loadInvitations();
-      // Actualizar cada 30 segundos
       const interval = setInterval(loadInvitations, 30000);
       return () => clearInterval(interval);
     }
@@ -25,27 +31,21 @@ const NotificationsWidget = () => {
   const loadInvitations = async () => {
     if (!user) return;
     try {
-      const pendingInvitations = await getPendingInvitations(user.id);
-      // Cargar información adicional de las invitaciones
-      const invitationsWithData = await Promise.all(
-        pendingInvitations.map(async (inv) => {
+      const pending = await getPendingInvitations(user.id);
+      const withData = await Promise.all(
+        pending.map(async (inv) => {
           try {
             const [fromUser, teamData] = await Promise.all([
               getUserById(inv.fromUserId).catch(() => ({ username: 'Usuario' })),
               getTeamById(inv.teamId).catch(() => ({ name: 'Equipo' }))
             ]);
-            return {
-              ...inv,
-              fromUserName: fromUser.username || 'Usuario',
-              teamName: teamData?.name || 'Equipo'
-            };
-          } catch (error) {
-            console.error('Error cargando datos de invitación:', error);
+            return { ...inv, fromUserName: fromUser.username || 'Usuario', teamName: teamData?.name || 'Equipo' };
+          } catch {
             return { ...inv, fromUserName: 'Usuario', teamName: 'Equipo' };
           }
         })
       );
-      setInvitations(invitationsWithData);
+      setInvitations(withData);
     } catch (error) {
       console.error('Error cargando invitaciones:', error);
     }
@@ -53,13 +53,12 @@ const NotificationsWidget = () => {
 
   const handleAccept = async (invitationId, e) => {
     e.stopPropagation();
+    setLoading(true);
     try {
-      setLoading(true);
       await acceptInvitation(invitationId);
       await loadInvitations();
-      alert('Invitación aceptada');
     } catch (error) {
-      alert('Error al aceptar invitación: ' + error.message);
+      alert('Error al aceptar: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -67,12 +66,12 @@ const NotificationsWidget = () => {
 
   const handleReject = async (invitationId, e) => {
     e.stopPropagation();
+    setLoading(true);
     try {
-      setLoading(true);
       await rejectInvitation(invitationId);
       await loadInvitations();
     } catch (error) {
-      alert('Error al rechazar invitación: ' + error.message);
+      alert('Error al rechazar: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -87,30 +86,29 @@ const NotificationsWidget = () => {
         onClick={() => setShowDropdown(!showDropdown)}
         title="Notificaciones"
       >
-        <Bell size={20} />
+        <Bell size={18} />
         {invitations.length > 0 && (
           <span className="notification-badge">{invitations.length}</span>
         )}
       </button>
+
       {showDropdown && (
         <>
           <div className="dropdown-backdrop" onClick={() => setShowDropdown(false)} />
           <div className="notifications-dropdown">
             <div className="notifications-header">
-              <h3>Invitaciones a Equipos</h3>
+              <h3>Invitaciones</h3>
               <button onClick={() => setShowDropdown(false)} className="close-dropdown">×</button>
             </div>
             {invitations.length === 0 ? (
-              <div className="no-notifications">
-                <p>No hay invitaciones pendientes</p>
-              </div>
+              <div className="no-notifications">Sin invitaciones pendientes</div>
             ) : (
               <div className="notifications-list">
                 {invitations.map(inv => (
                   <div key={inv.id} className="notification-item">
                     <div className="notification-content">
-                      <strong>{inv.fromUserName || 'Usuario'}</strong> te invitó a unirte al equipo{' '}
-                      <strong>{inv.teamName || 'Equipo'}</strong>
+                      <strong>{inv.fromUserName}</strong> te invitó al equipo{' '}
+                      <strong>{inv.teamName}</strong>
                     </div>
                     <div className="notification-actions">
                       <button
@@ -119,7 +117,7 @@ const NotificationsWidget = () => {
                         disabled={loading}
                         title="Aceptar"
                       >
-                        <Check size={14} />
+                        <Check size={13} />
                       </button>
                       <button
                         onClick={(e) => handleReject(inv.id, e)}
@@ -127,7 +125,7 @@ const NotificationsWidget = () => {
                         disabled={loading}
                         title="Rechazar"
                       >
-                        <X size={14} />
+                        <X size={13} />
                       </button>
                     </div>
                   </div>
@@ -144,51 +142,95 @@ const NotificationsWidget = () => {
 const Navbar = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+
   return (
     <nav className="navbar">
       <div className="navbar-content">
-        <div className="navbar-brand" onClick={() => navigate('/dashboard')}>
-          <div className="navbar-logo">
-            <span className="gta-logo-small">⭐</span>
-            <h2>Los Santos Custom</h2>
-          </div>
+        <div onClick={() => navigate('/dashboard')}>
+          <BrandLogo />
         </div>
 
         <div className="navbar-menu">
-          {isAdmin ? (
+          <button
+            className={isActive('/dashboard') ? 'active' : ''}
+            onClick={() => navigate('/dashboard')}
+          >
+            Inicio
+          </button>
+          <button
+            className={isActive('/events') ? 'active' : ''}
+            onClick={() => navigate('/events')}
+          >
+            Eventos
+          </button>
+          <button
+            className={isActive('/ganadores') ? 'active' : ''}
+            onClick={() => navigate('/ganadores')}
+          >
+            Ganadores
+          </button>
+          <button
+            className={isActive('/equipos') ? 'active' : ''}
+            onClick={() => navigate('/equipos')}
+          >
+            Equipos
+          </button>
+
+          {isAdmin && (
             <>
-              <button onClick={() => navigate('/dashboard')}>Inicio</button>
-              <button onClick={() => navigate('/events')}>Eventos</button>
-              <button onClick={() => navigate('/teams')}>Equipos</button>
-              <button onClick={() => navigate('/winners')}>Ganadores</button>
-              <button onClick={() => navigate('/admin/users')}>Admin: Usuarios</button>
-              <button onClick={() => navigate('/admin/events')}>Admin: Eventos</button>
-              <button onClick={() => navigate('/admin/bets')}>Admin: Apuestas</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => navigate('/dashboard')}>Inicio</button>
-              <button onClick={() => navigate('/events')}>Eventos</button>
-              <button onClick={() => navigate('/teams')}>Equipos</button>
-              <button onClick={() => navigate('/winners')}>Ganadores</button>
+              <div className="navbar-admin-sep" />
+              <button
+                className={isActive('/admin/usuarios') ? 'active' : ''}
+                onClick={() => navigate('/admin/usuarios')}
+              >
+                Usuarios
+              </button>
+              <button
+                className={isActive('/admin/eventos') ? 'active' : ''}
+                onClick={() => navigate('/admin/eventos')}
+              >
+                Eventos
+              </button>
+              <button
+                className={isActive('/admin/apuestas') ? 'active' : ''}
+                onClick={() => navigate('/admin/apuestas')}
+              >
+                Apuestas
+              </button>
             </>
           )}
         </div>
 
         <div className="navbar-user">
           <NotificationsWidget />
-          <div className="user-info clickable" onClick={() => navigate('/profile')} title="Ir a mi perfil">
-            <User size={20} />
-            <span>{user?.username}</span>
+
+          <div
+            className="user-info clickable"
+            onClick={() => navigate('/perfil')}
+            title="Mi perfil"
+          >
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt="avatar" className="user-avatar" />
+            ) : (
+              <div className="user-avatar-placeholder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                </svg>
+              </div>
+            )}
+            <span>{user?.username || user?.name}</span>
           </div>
+
           <button onClick={handleLogout} className="logout-button">
-            <LogOut size={18} />
+            <LogOut size={16} />
             Salir
           </button>
         </div>

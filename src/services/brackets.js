@@ -120,8 +120,12 @@ export const generateSmartBrackets = async (eventId, participants, bracketType, 
     const topFavorites = sortedParticipants.slice(0, topFavoritesCount);
     const restParticipants = sortedParticipants.slice(topFavoritesCount);
 
-    // Mezclar aleatoriamente el resto
-    const shuffledRest = [...restParticipants].sort(() => Math.random() - 0.5);
+    // Ordenar el resto por joinedAt (determinista — todos los clientes ven lo mismo)
+    const sortedRest = [...restParticipants].sort((a, b) => {
+      const ta = a.joinedAt?.seconds || a.joinedAt?.toMillis?.() || 0;
+      const tb = b.joinedAt?.seconds || b.joinedAt?.toMillis?.() || 0;
+      return ta - tb;
+    });
 
     // Generar todas las rondas del torneo
     const allRounds = generateTournamentRounds(
@@ -129,7 +133,7 @@ export const generateSmartBrackets = async (eventId, participants, bracketType, 
       bracketType,
       participantsPerBracket,
       topFavorites,
-      shuffledRest
+      sortedRest
     );
 
     // Validar que se generaron rondas
@@ -287,11 +291,12 @@ const distributeFavorites = (participants, topFavorites, shuffledRest, bracketSi
 // Generar brackets para carreras con grupos
 const generateRaceBrackets = (participants, maxPerGroup) => {
   const rounds = [];
-  const totalParticipants = participants.length;
-  
-  // Primera ronda: dividir en grupos
-  const groups = [];
-  const shuffled = [...participants].sort(() => Math.random() - 0.5);
+  // Ordenar por joinedAt para distribución determinista
+  const shuffled = [...participants].sort((a, b) => {
+    const ta = a.joinedAt?.seconds || a.joinedAt?.toMillis?.() || 0;
+    const tb = b.joinedAt?.seconds || b.joinedAt?.toMillis?.() || 0;
+    return ta - tb;
+  });
   
   for (let i = 0; i < shuffled.length; i += maxPerGroup) {
     const group = shuffled.slice(i, i + maxPerGroup);

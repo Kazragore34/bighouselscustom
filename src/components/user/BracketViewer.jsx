@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBracketsByEvent, generatePreviewBrackets } from '../../services/brackets';
-import { getEventParticipants } from '../../services/events';
+import { getBracketsByEvent } from '../../services/brackets';
 import { getUserById } from '../../services/users';
 import { Trophy, ArrowLeft, RefreshCw } from 'lucide-react';
 import './BracketViewer.css';
@@ -12,132 +11,64 @@ const BracketViewer = () => {
   const [brackets, setBrackets] = useState([]);
   const [participants, setParticipants] = useState({});
   const [loading, setLoading] = useState(true);
-  const [isPreview, setIsPreview] = useState(false);
 
-  useEffect(() => {
-    loadBrackets();
-    
-    // NO actualizar automáticamente constantemente
-    // Solo se actualizará cuando el usuario haga clic en "Actualizar" o cuando cambien los participantes
-    // Esto evita que los brackets cambien constantemente y no se puedan ver
-    
-    // Cleanup: no hay intervalos que limpiar
-    return () => {
-      // No hay intervalos activos
-    };
-  }, [eventId]);
+  useEffect(() => { loadBrackets(); }, [eventId]);
 
   const loadBrackets = async () => {
     try {
       setLoading(true);
-      console.log('Cargando brackets para evento:', eventId);
-      
-      // Primero intentar cargar brackets oficiales
-      let bracketsData = [];
-      try {
-        const allBrackets = await getBracketsByEvent(eventId);
-        // Filtrar solo brackets del evento actual para asegurar que no haya mezcla
-        bracketsData = allBrackets.filter(b => b.eventId === eventId);
-        console.log('Brackets oficiales encontrados:', bracketsData.length, bracketsData);
-        
-        if (bracketsData.length > 0) {
-          setIsPreview(false);
-        } else {
-          setIsPreview(true);
-        }
-      } catch (error) {
-        console.warn('No hay brackets oficiales, generando preview:', error);
-        setIsPreview(true);
-      }
-
-      // Si no hay brackets oficiales, generar preview basado en participantes actuales
-      if (bracketsData.length === 0) {
-        const eventParticipants = await getEventParticipants(eventId);
-        console.log('Participantes del evento:', eventParticipants);
-        
-        if (eventParticipants.length > 0) {
-          // Obtener datos del evento para saber el tipo de bracket
-          const { getEventById } = await import('../../services/events');
-          const event = await getEventById(eventId);
-          const bracketType = event.bracketType || '1v1';
-          const participantsPerBracket = event.participantsPerBracket || 2;
-          
-          // Generar preview de brackets SOLO con participantes de este evento
-          bracketsData = await generatePreviewBrackets(eventParticipants, bracketType, participantsPerBracket, eventId);
-          setIsPreview(true);
-        }
-      }
-
+      // Solo leer brackets guardados en Firestore — nunca generar en cliente
+      const allBrackets = await getBracketsByEvent(eventId);
+      const bracketsData = allBrackets.filter(b => b.eventId === eventId);
       setBrackets(bracketsData);
 
-      // Cargar información de participantes (incluyendo ganadores de matches anteriores)
-      const participantIds = new Set();
-      bracketsData.forEach(bracket => {
-        if (bracket.matches && Array.isArray(bracket.matches)) {
-          bracket.matches.forEach(match => {
-            if (match.participants && Array.isArray(match.participants)) {
-              match.participants.forEach(id => {
-                // Manejar placeholders de ganadores de grupos
-                if (!id.startsWith('winner-group-')) {
-                  participantIds.add(id);
-                }
-              });
-            }
-            // Agregar ganadores también
-            if (match.winnerId) {
-              participantIds.add(match.winnerId);
-            }
+      // Cargar datos de participantes
+      const ids = new Set();
+      bracketsData.forEach(b => {
+        b.matches?.forEach(m => {
+          m.participants?.forEach(id => {
+            if (id && !id.startsWith('winner-group-') && id !== 'pending') ids.add(id);
           });
-        }
+          if (m.winnerId) ids.add(m.winnerId);
+        });
       });
 
-      const participantsData = {};
-      for (const id of participantIds) {
+      const pData = {};
+      for (const id of ids) {
         try {
-          const userData = await getUserById(id);
-          participantsData[id] = userData;
-        } catch (error) {
-          console.warn('Error cargando participante:', id, error);
-          participantsData[id] = { username: id };
+          pData[id] = await getUserById(id);
+        } catch {
+          pData[id] = { username: id };
         }
       }
-      setParticipants(participantsData);
+      setParticipants(pData);
     } catch (error) {
       console.error('Error cargando brackets:', error);
-      // No mostrar alert, solo log
     } finally {
       setLoading(false);
     }
   };
 
-  const getParticipantName = (participantId) => {
-    return participants[participantId]?.username || participantId;
-  };
+  const getName = (id) => participants[id]?.username || id;
 
   if (loading) {
-    return <div className="loading">Cargando brackets...</div>;
+    return <div className="loading" style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando brackets...</div>;
   }
 
   if (brackets.length === 0) {
     return (
       <div className="bracket-viewer">
         <div className="bracket-header">
-          <button
-            onClick={() => navigate(`/events/${eventId}`)}
-            className="btn-back"
-            title="Volver al evento"
-          >
-            <ArrowLeft size={18} />
-            Volver al Evento
+          <button onClick={() => navigate(`/events/${eventId}`)} className="btn-back">
+            <ArrowLeft size={16} /> Volver
           </button>
-          <h2>Brackets del Evento</h2>
+          <h2>Bracket del Evento</h2>
+          <div />
         </div>
         <div className="no-brackets">
           <Trophy size={48} />
-          <p>Los brackets aún no han sido creados</p>
-          <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '10px' }}>
-            El administrador debe crear los brackets desde el panel de administración.
-          </p>
+          <p>El bracket aún no ha sido generado</p>
+          <p className="no-brackets-sub">El administrador debe generarlo desde el panel de control del evento.</p>
         </div>
       </div>
     );
@@ -146,146 +77,87 @@ const BracketViewer = () => {
   return (
     <div className="bracket-viewer">
       <div className="bracket-header">
-        <button
-          onClick={() => navigate(`/events/${eventId}`)}
-          className="btn-back"
-          title="Volver al evento"
-        >
-          <ArrowLeft size={18} />
-          Volver al Evento
+        <button onClick={() => navigate(`/events/${eventId}`)} className="btn-back">
+          <ArrowLeft size={16} /> Volver
         </button>
-        <div className="bracket-title-section">
-          <h2>Brackets del Evento</h2>
-          {isPreview && (
-            <span className="preview-badge">
-              📊 Vista Previa (basada en participantes actuales)
-            </span>
-          )}
-        </div>
-        <button
-          onClick={loadBrackets}
-          className="btn-refresh"
-          title="Actualizar brackets"
-        >
-          <RefreshCw size={18} />
-          Actualizar
+        <h2>Bracket del Evento</h2>
+        <button onClick={loadBrackets} className="btn-refresh">
+          <RefreshCw size={16} /> Actualizar
         </button>
       </div>
-      
+
       <div className="bracket-rounds-container">
-        {brackets.map((bracket, bracketIndex) => (
-          <div key={bracketIndex} className="bracket-round">
-            <h3>
-              {bracket.isFinal ? '🏆 Final' : `Ronda ${bracket.round}`}
+        {brackets.map((bracket, bi) => (
+          <div key={bracket.id || bi} className="bracket-round">
+            <h3 className="round-title">
+              {bracket.isFinal ? '◈ Final' : `Ronda ${bracket.round}`}
             </h3>
             <div className="matches-container">
-            {bracket.matches.map((match, matchIndex) => (
-              <div key={matchIndex} className={`match-card ${match.isGroup ? 'group-match' : ''} ${match.isFinal ? 'final-match' : ''}`}>
-                <div className="match-header">
-                  {match.isGroup ? (
-                    <span>Grupo {matchIndex + 1}</span>
-                  ) : match.isFinal ? (
-                    <span>🏆 Final</span>
-                  ) : (
-                    <span>Match {matchIndex + 1}</span>
-                  )}
-                  {match.winnerId && (
-                    <span className="winner-badge">
-                      <Trophy size={14} />
-                      Ganador
-                    </span>
-                  )}
-                </div>
-                <div className="match-participants">
-                  {match.participants.map((participantId, pIndex) => {
-                    // Manejar placeholders para ganadores de grupos
-                    if (participantId.startsWith('winner-group-')) {
-                      // Buscar el ganador real del grupo anterior SOLO en brackets del mismo evento
-                      const groupNumber = participantId.replace('winner-group-', '');
-                      const previousRound = brackets.find((b, idx) => 
-                        idx < bracketIndex && 
-                        b.round === bracket.round - 1 &&
-                        b.eventId === bracket.eventId
-                      );
-                      let actualWinner = null;
-                      
-                      if (previousRound && previousRound.matches) {
-                        const groupMatch = previousRound.matches[parseInt(groupNumber) - 1];
-                        if (groupMatch && groupMatch.winnerId) {
-                          actualWinner = groupMatch.winnerId;
-                        }
-                      }
-                      
-                      return (
-                        <div key={participantId} className={`participant placeholder ${actualWinner ? 'has-winner' : ''}`}>
-                          <div className="participant-name">
-                            {actualWinner ? (
-                              <>
-                                <Trophy size={14} className="trophy-icon-small" />
-                                {getParticipantName(actualWinner)}
-                              </>
-                            ) : (
-                              `Ganador ${participantId.replace('winner-group-', 'Grupo ')}`
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }
-                    
-                    // Filtrar "pending" y valores inválidos - no mostrar participantes pendientes
-                    if (!participantId || participantId === 'pending' || participantId === null || participantId === undefined) {
-                      return null;
-                    }
-                    
-                    const isWinner = match.winnerId === participantId;
-                    const participant = participants[participantId];
-                    
-                    return (
-                      <div
-                        key={participantId}
-                        className={`participant ${isWinner ? 'winner' : ''} ${match.status === 'completed' && !isWinner ? 'eliminated' : ''}`}
-                      >
-                        <div className="participant-info-row">
-                          {participant?.photoURL ? (
-                            <img src={participant.photoURL} alt={participant.username} className="participant-photo-bracket" />
-                          ) : (
-                            <div className="participant-photo-placeholder-bracket">
-                              {participant?.username?.charAt(0).toUpperCase() || '?'}
+              {bracket.matches?.map((match, mi) => (
+                <div
+                  key={match.id || mi}
+                  className={`match-card${match.isGroup ? ' group-match' : ''}${match.isFinal ? ' final-match' : ''}`}
+                >
+                  <div className="match-header">
+                    <span>{match.isGroup ? `Grupo ${mi + 1}` : match.isFinal ? '◈ Final' : `Match ${mi + 1}`}</span>
+                    {match.winnerId && (
+                      <span className="winner-badge"><Trophy size={12} /> Resuelto</span>
+                    )}
+                  </div>
+
+                  <div className="match-participants">
+                    {match.participants?.map((pid) => {
+                      if (!pid || pid === 'pending') return null;
+
+                      // Placeholder de ganador de grupo
+                      if (pid.startsWith('winner-group-')) {
+                        const groupIdx = parseInt(pid.replace('winner-group-', '')) - 1;
+                        const prevRound = brackets.find((b, idx) => idx < bi && b.round === bracket.round - 1);
+                        const actualWinner = prevRound?.matches?.[groupIdx]?.winnerId;
+                        return (
+                          <div key={pid} className={`participant placeholder${actualWinner ? ' has-winner' : ''}`}>
+                            <div className="participant-name">
+                              {actualWinner
+                                ? <><Trophy size={12} /> {getName(actualWinner)}</>
+                                : `Ganador ${pid.replace('winner-group-', 'Grupo ')}`
+                              }
                             </div>
-                          )}
-                          <div className="participant-name">
-                            {getParticipantName(participantId)}
                           </div>
+                        );
+                      }
+
+                      const isWinner = match.winnerId === pid;
+                      const p = participants[pid];
+                      return (
+                        <div
+                          key={pid}
+                          className={`participant${isWinner ? ' winner' : ''}${match.status === 'completed' && !isWinner ? ' eliminated' : ''}`}
+                        >
+                          <div className="participant-info-row">
+                            {p?.photoURL ? (
+                              <img src={p.photoURL} alt="" className="participant-photo-bracket" />
+                            ) : (
+                              <div className="participant-photo-placeholder-bracket">
+                                {(p?.username || '?')[0].toUpperCase()}
+                              </div>
+                            )}
+                            <span className="participant-name">{getName(pid)}</span>
+                          </div>
+                          {isWinner && <div className="winner-indicator"><Trophy size={14} /> Ganador</div>}
+                          {match.status === 'completed' && !isWinner && <div className="eliminated-indicator">Eliminado</div>}
                         </div>
-                        {isWinner && (
-                          <div className="winner-indicator">
-                            <Trophy size={18} className="trophy-icon" />
-                            <span>Ganador</span>
-                          </div>
-                        )}
-                        {match.status === 'completed' && !isWinner && (
-                          <div className="eliminated-indicator">
-                            Eliminado
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+
+                  <div className={`match-status ${match.status}`}>
+                    {match.status === 'completed'
+                      ? <span className="status-completed"><Trophy size={12} /> Completado</span>
+                      : <span className="status-pending">⏳ Pendiente</span>
+                    }
+                  </div>
                 </div>
-                <div className={`match-status ${match.status}`}>
-                  {match.status === 'completed' ? (
-                    <span className="status-completed">
-                      <Trophy size={14} />
-                      Completado
-                    </span>
-                  ) : (
-                    <span className="status-pending">
-                      ⏳ Pendiente
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+              ))}
             </div>
           </div>
         ))}

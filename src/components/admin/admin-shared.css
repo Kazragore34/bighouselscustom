@@ -1,0 +1,363 @@
+/* Estilos compartidos entre componentes admin */
+
+.admin-page {
+  padding: 32px 24px;
+  max-width: 1300px;
+  margin: 0 auto;
+  animation: fadeIn 0.35s ease-out;
+}
+
+.admin-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-gold);
+}
+
+.admin-page-header h1 {
+  margin: 0;
+  font-family: 'Cinzel', serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.06em;
+}
+
+.admin-page-header h1 span {
+  color: var(--gold-primary);
+}
+
+/* Barra de búsqueda */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-gold);
+  padding: 10px 16px;
+  border-radius: 9px;
+  margin-bottom: 20px;
+  transition: border-color 0.2s;
+}
+
+.search-bar:focus-within {
+  border-color: var(--gold-primary);
+}
+
+.search-bar svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: 'DM Sans', sans-serif;
+  padding: 0;
+  box-shadow: none;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Tablas admin */
+.admin-table-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table thead {
+  background: rgba(201,168,76,0.08);
+  border-bottom: 1px solid var(--border-gold);
+}
+
+.admin-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gold-primary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.admin-table tbody tr:nth-child(even) {
+  background: rgba(255,255,255,0.015);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--gold-glow);
+}
+
+/* Botones de acción en tabla */
+.table-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-table-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s ease;
+}
+
+.btn-table-edit {
+  background: transparent;
+  color: var(--gold-primary);
+  border-color: var(--border-gold);
+}
+.btn-table-edit:hover {
+  background: var(--gold-glow);
+}
+
+.btn-table-danger {
+  background: transparent;
+  color: #CF6679;
+  border-color: rgba(122,45,45,0.5);
+}
+.btn-table-danger:hover {
+  background: var(--danger-light);
+}
+
+.btn-table-success {
+  background: transparent;
+  color: #4CAF7A;
+  border-color: rgba(45,122,79,0.5);
+}
+.btn-table-success:hover {
+  background: var(--success-light);
+}
+
+.btn-table-neutral {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: rgba(255,255,255,0.1);
+}
+.btn-table-neutral:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+/* Botón principal añadir */
+.btn-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  color: #0a0a0a;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.03em;
+}
+
+.btn-add:hover {
+  background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
+  box-shadow: 0 4px 16px var(--gold-glow-strong);
+}
+
+/* Modal admin */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.admin-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.admin-modal h2 {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--gold-primary);
+  letter-spacing: 0.08em;
+  margin: 0 0 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-gold);
+}
+
+.admin-modal .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.admin-modal .form-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-modal .form-group input,
+.admin-modal .form-group select,
+.admin-modal .form-group textarea {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-gold);
+  color: var(--text-primary);
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+  font-family: 'DM Sans', sans-serif;
+  box-sizing: border-box;
+}
+
+.admin-modal .form-group input:focus,
+.admin-modal .form-group select:focus,
+.admin-modal .form-group textarea:focus {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+  outline: none;
+}
+
+.admin-modal .form-group select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.admin-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-gold);
+}
+
+.btn-cancel {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 9px 18px;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel:hover {
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.btn-save {
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  color: #0a0a0a;
+  border: none;
+  padding: 9px 20px;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-save:hover {
+  background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
+  box-shadow: 0 4px 14px var(--gold-glow-strong);
+}
+
+.btn-save:disabled,
+.btn-cancel:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Roles badges */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.role-ADMIN { background: rgba(201,168,76,0.15); color: var(--gold-primary); border: 1px solid var(--border-gold); }
+.role-APOSTADOR { background: var(--success-light); color: #4CAF7A; border: 1px solid rgba(45,122,79,0.4); }
+.role-PARTICIPANTE { background: var(--pending-light); color: #9090CC; border: 1px solid rgba(74,74,122,0.4); }
+.role-PENDIENTE_VERIFICACION { background: var(--warning-light); color: #D4A44C; border: 1px solid rgba(122,107,45,0.4); }
+.role-SOLO_VISUALIZAR { background: rgba(92,82,66,0.2); color: var(--text-muted); border: 1px solid rgba(92,82,66,0.4); }
+.role-VOTANTE_APOSTADOR { background: var(--success-light); color: #4CAF7A; border: 1px solid rgba(45,122,79,0.4); }
+
+/* Habilitado/Deshabilitado */
+.enabled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.enabled-yes { background: var(--success-light); color: #4CAF7A; }
+.enabled-no  { background: var(--danger-light);  color: #CF6679; }

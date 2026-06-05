@@ -121,7 +121,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAdmin = () => {
-    return user && user.userType === 'ADMIN';
+    return user && (user.userType === 'ADMIN' || user.role === 'ADMIN');
+  };
+
+  // Helper: puede votar y apostar
+  const canBet = () => {
+    if (!user) return false;
+    const t = user.userType || user.role || '';
+    return ['APOSTADOR', 'PARTICIPANTE', 'VOTANTE_APOSTADOR', 'ADMIN'].includes(t);
   };
 
   const value = {
@@ -131,6 +138,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     refreshUser,
     isAdmin: isAdmin(),
+    canBet: canBet(),
     loading
   };
 

@@ -3,46 +3,38 @@ import { getPendingBets, confirmBet, getBetsByEvent } from '../../services/bets'
 import { getUserById } from '../../services/users';
 import { useAuth } from '../../context/AuthContext';
 import { getAllEvents } from '../../services/events';
-import { Check, X, DollarSign, Clock, TrendingUp } from 'lucide-react';
+import { Check, DollarSign, Clock, TrendingUp, RefreshCw } from 'lucide-react';
+import './admin-shared.css';
 import './BetConfirmation.css';
 
 const BetConfirmation = () => {
   const { user } = useAuth();
   const [pendingBets, setPendingBets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [totalPot, setTotalPot] = useState(0); // Bote total de todas las apuestas confirmadas
-  const [eventPots, setEventPots] = useState({}); // Bote por evento
+  const [totalPot, setTotalPot] = useState(0);
+  const [eventPots, setEventPots] = useState({});
 
-  useEffect(() => {
-    loadPendingBets();
-    loadTotalPot();
-  }, []);
+  useEffect(() => { loadAll(); }, []);
+
+  const loadAll = async () => {
+    setLoading(true);
+    await Promise.all([loadPendingBets(), loadTotalPot()]);
+    setLoading(false);
+  };
 
   const loadPendingBets = async () => {
     try {
-      setLoading(true);
       const bets = await getPendingBets();
-      
-      // Cargar información de usuarios
-      const betsWithUsers = await Promise.all(
-        bets.map(async (bet) => {
-          const [userData, participantData] = await Promise.all([
-            getUserById(bet.userId),
-            getUserById(bet.participantId)
-          ]);
-          return {
-            ...bet,
-            userName: userData.username,
-            participantName: participantData.username
-          };
-        })
-      );
-
-      setPendingBets(betsWithUsers);
+      const withUsers = await Promise.all(bets.map(async bet => {
+        const [u, p] = await Promise.all([
+          getUserById(bet.userId).catch(() => ({ username: bet.userId })),
+          getUserById(bet.participantId).catch(() => ({ username: bet.participantId })),
+        ]);
+        return { ...bet, userName: u.username, participantName: p.username };
+      }));
+      setPendingBets(withUsers);
     } catch (error) {
       console.error('Error cargando apuestas:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -50,95 +42,87 @@ const BetConfirmation = () => {
     try {
       const events = await getAllEvents();
       let total = 0;
-      const potsByEvent = {};
-
-      for (const event of events) {
+      const pots = {};
+      for (const ev of events) {
         try {
-          const bets = await getBetsByEvent(event.id);
-          const confirmedBets = bets.filter(b => b.status === 'confirmed');
-          const eventTotal = confirmedBets.reduce((sum, bet) => sum + bet.amount, 0);
-          total += eventTotal;
-          potsByEvent[event.id] = {
-            eventName: event.name,
-            total: eventTotal,
-            count: confirmedBets.length
-          };
-        } catch (error) {
-          console.error(`Error cargando apuestas para evento ${event.id}:`, error);
-        }
+          const bets = await getBetsByEvent(ev.id);
+          const confirmed = bets.filter(b => b.status === 'confirmed');
+          const evTotal = confirmed.reduce((s, b) => s + b.amount, 0);
+          total += evTotal;
+          if (evTotal > 0) pots[ev.id] = { name: ev.name, total: evTotal, count: confirmed.length };
+        } catch {}
       }
-
       setTotalPot(total);
-      setEventPots(potsByEvent);
+      setEventPots(pots);
     } catch (error) {
-      console.error('Error cargando bote total:', error);
+      console.error('Error cargando botes:', error);
     }
   };
 
-  const handleConfirmBet = async (betId) => {
-    if (!confirm('¿Confirmar el pago de esta apuesta?')) {
-      return;
-    }
-
+  const handleConfirm = async (betId) => {
+    if (!confirm('¿Confirmar el pago IC de esta apuesta?')) return;
     try {
       await confirmBet(betId, user.id);
-      alert('Apuesta confirmada exitosamente');
-      loadPendingBets();
-      loadTotalPot(); // Recargar bote total después de confirmar
+      await loadAll();
     } catch (error) {
-      alert('Error al confirmar apuesta');
+      alert('Error al confirmar: ' + error.message);
     }
   };
 
-  if (loading) {
-    return <div className="loading">Cargando apuestas pendientes...</div>;
-  }
+  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando apuestas...</div>;
 
   return (
-    <div className="bet-confirmation">
-      <div className="bet-confirmation-header">
-        <h1>Confirmación de Apuestas</h1>
-        <div className="header-stats">
-          <div className="stat-item">
-            <Clock size={20} />
-            <span>{pendingBets.length} apuestas pendientes</span>
-          </div>
-          <div className="stat-item pot-total">
-            <TrendingUp size={20} />
-            <span>Bote Total: ${totalPot.toFixed(2)}</span>
-          </div>
+    <div className="admin-page">
+      <div className="admin-page-header">
+        <h1>Confirmación de <span>Apuestas</span></h1>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+            <Clock size={15} /> {pendingBets.length} pendientes
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.88rem', color: 'var(--gold-primary)', fontWeight: 700 }}>
+            <TrendingUp size={15} /> ${totalPot.toFixed(0)} en botes
+          </span>
+          <button
+            onClick={loadAll}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: '1px solid var(--border-gold)', color: 'var(--text-muted)', padding: '7px 12px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem' }}
+          >
+            <RefreshCw size={14} /> Actualizar
+          </button>
         </div>
       </div>
 
-      {/* Resumen de botes por evento */}
+      {/* Botes por evento */}
       {Object.keys(eventPots).length > 0 && (
         <div className="event-pots-summary">
-          <h2>Botes por Evento</h2>
+          <p style={{ fontSize: '0.75rem', color: 'var(--gold-primary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12, fontFamily: 'Cinzel, serif', fontWeight: 700 }}>
+            Botes Activos
+          </p>
           <div className="pots-grid">
-            {Object.entries(eventPots).map(([eventId, pot]) => (
-              <div key={eventId} className="pot-card">
-                <h3>{pot.eventName}</h3>
-                <div className="pot-amount">${pot.total.toFixed(2)}</div>
-                <div className="pot-count">{pot.count} apuestas confirmadas</div>
+            {Object.entries(eventPots).map(([id, pot]) => (
+              <div key={id} className="pot-card">
+                <div className="pot-name">{pot.name}</div>
+                <div className="pot-amount">${pot.total.toFixed(0)}</div>
+                <div className="pot-count">{pot.count} confirmadas</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* Tabla de pendientes */}
       {pendingBets.length === 0 ? (
-        <div className="no-bets">
-          <Check size={64} />
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+          <Check size={40} style={{ color: 'var(--gold-dark)', opacity: 0.4, marginBottom: 12 }} />
           <p>No hay apuestas pendientes de confirmación</p>
         </div>
       ) : (
-        <div className="bets-table-container">
-          <table className="bets-table">
+        <div className="admin-table-container">
+          <table className="admin-table">
             <thead>
               <tr>
                 <th>Usuario</th>
-                <th>Participante</th>
-                <th>Monto</th>
+                <th>Apostó a</th>
+                <th>Monto IC</th>
                 <th>Fecha</th>
                 <th>Acción</th>
               </tr>
@@ -146,22 +130,19 @@ const BetConfirmation = () => {
             <tbody>
               {pendingBets.map(bet => (
                 <tr key={bet.id}>
-                  <td>{bet.userName}</td>
+                  <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{bet.userName}</td>
                   <td>{bet.participantName}</td>
-                  <td className="amount-cell">
-                    <DollarSign size={16} />
-                    {bet.amount.toFixed(2)}
+                  <td>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--gold-primary)', fontWeight: 700, fontFamily: 'Cinzel, serif' }}>
+                      <DollarSign size={13} />{(bet.amount || 0).toFixed(0)}
+                    </span>
+                  </td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+                    {bet.createdAt?.toDate ? bet.createdAt.toDate().toLocaleDateString('es-ES') : '—'}
                   </td>
                   <td>
-                    {bet.createdAt?.toDate ? bet.createdAt.toDate().toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td>
-                    <button
-                      onClick={() => handleConfirmBet(bet.id)}
-                      className="btn-confirm"
-                    >
-                      <Check size={16} />
-                      Confirmar Pago
+                    <button onClick={() => handleConfirm(bet.id)} className="btn-table-action btn-table-success">
+                      <Check size={13} /> Confirmar Pago
                     </button>
                   </td>
                 </tr>

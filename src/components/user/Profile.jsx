@@ -6,15 +6,25 @@ import { getVotesByUser } from '../../services/votes';
 import { fileToBase64 } from '../../utils/imageUtils';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Upload, Award, History, DollarSign, Heart, Edit2, Save, X } from 'lucide-react';
+import { Upload, Award, DollarSign, Heart, Edit2, Save, X } from 'lucide-react';
 import './Profile.css';
 
-const iconMap = {
-  car: '🚗',
-  boxing: '🥊',
-  running: '🏃',
-  search: '🔍',
-  trophy: '🏆'
+const BET_STATUS = {
+  pending: { label: 'Pendiente', cls: 'pending' },
+  confirmed: { label: 'Confirmada', cls: 'confirmed' },
+  GANADORA: { label: 'Ganada 🎉', cls: 'won' },
+  PERDIDA: { label: 'Perdida', cls: 'lost' },
+  DEVUELTA: { label: 'Devuelta', cls: 'returned' },
+  paid_out: { label: 'Pagada', cls: 'won' },
+};
+
+const ROLE_LABELS = {
+  PENDIENTE_VERIFICACION: 'Pendiente de Verificación',
+  APOSTADOR: 'Apostador',
+  PARTICIPANTE: 'Participante',
+  ADMIN: 'Administrador',
+  VOTANTE_APOSTADOR: 'Apostador',
+  SOLO_VISUALIZAR: 'Solo Visualizar',
 };
 
 const Profile = () => {
@@ -27,125 +37,46 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({ name: '', email: '' });
 
-  useEffect(() => {
-    loadProfileData();
-  }, [user]);
+  useEffect(() => { loadProfileData(); }, [user]);
 
   const loadProfileData = async () => {
+    if (!user) { setLoading(false); return; }
     try {
       setLoading(true);
-      if (!user) {
-        console.error('Usuario no válido:', user);
-        setLoading(false);
-        return;
-      }
-
-      console.log('Cargando perfil para usuario:', user);
       let userInfo = null;
-      
-      // Estrategia 1: Intentar por ID si existe
+
       if (user.id) {
-        try {
-          console.log('Intentando obtener por ID:', user.id);
-          userInfo = await getUserById(user.id);
-          console.log('Usuario obtenido por ID:', userInfo);
-        } catch (error) {
-          console.warn('Error obteniendo por ID, intentando por email/username:', error.message);
-          userInfo = null;
-        }
+        try { userInfo = await getUserById(user.id); } catch {}
       }
-
-      // Estrategia 2: Buscar por email (prioritario para Google Auth)
       if (!userInfo && user.email) {
-        try {
-          console.log('Buscando por email:', user.email);
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('email', '==', user.email));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];
-            const userDataFromDoc = userDoc.data();
-            const { password: _, ...userWithoutPassword } = userDataFromDoc;
-            userInfo = {
-              id: userDoc.id,
-              ...userWithoutPassword
-            };
-            console.log('Usuario encontrado por email:', userInfo);
-          }
-        } catch (error) {
-          console.error('Error buscando por email:', error);
+        const snap = await getDocs(query(collection(db, 'users'), where('email', '==', user.email)));
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          const { password: _, ...rest } = d.data();
+          userInfo = { id: d.id, ...rest };
         }
       }
+      if (!userInfo && user.username) {
+        const snap = await getDocs(query(collection(db, 'users'), where('username', '==', user.username)));
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          const { password: _, ...rest } = d.data();
+          userInfo = { id: d.id, ...rest };
+        }
+      }
+      if (!userInfo) throw new Error('Usuario no encontrado. Cierra sesión y vuelve a entrar.');
 
-      // Estrategia 3: Buscar por username si no hay email
-      if (!userInfo && user.username && !user.email) {
-        try {
-          console.log('Buscando por username:', user.username);
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('username', '==', user.username));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0];
-            const userDataFromDoc = userDoc.data();
-            const { password: _, ...userWithoutPassword } = userDataFromDoc;
-            userInfo = {
-              id: userDoc.id,
-              ...userWithoutPassword
-            };
-            console.log('Usuario encontrado por username:', userInfo);
-          }
-        } catch (error) {
-          console.error('Error buscando por username:', error);
-        }
-      }
-
-      // Si encontramos el usuario, cargar datos adicionales
-      if (userInfo && userInfo.id) {
-        try {
-          const [betsData, votesData] = await Promise.all([
-            getBetsByUser(userInfo.id).catch((e) => {
-              console.warn('Error cargando apuestas:', e);
-              return [];
-            }),
-            getVotesByUser(userInfo.id).catch((e) => {
-              console.warn('Error cargando votos:', e);
-              return [];
-            })
-          ]);
-          
-          setUserData(userInfo);
-          setEditData({ name: userInfo.name || userInfo.username || '', email: userInfo.email || '' });
-          setBets(betsData);
-          setVotes(votesData);
-          
-          // Actualizar el usuario en localStorage si el ID cambió o no estaba
-          if (!user.id || userInfo.id !== user.id) {
-            const updatedUser = { ...user, id: userInfo.id };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            console.log('Usuario actualizado en localStorage');
-          }
-        } catch (error) {
-          console.error('Error cargando datos adicionales:', error);
-          // Aún así mostrar el perfil básico
-          setUserData(userInfo);
-          setEditData({ name: userInfo.name || userInfo.username || '', email: userInfo.email || '' });
-          setBets([]);
-          setVotes([]);
-        }
-      } else {
-        console.error('No se pudo encontrar el usuario en Firestore');
-        console.error('Datos del usuario en contexto:', user);
-        throw new Error('Usuario no encontrado. Por favor, cierra sesión y vuelve a iniciar sesión.');
-      }
+      const [betsData, votesData] = await Promise.all([
+        getBetsByUser(userInfo.id).catch(() => []),
+        getVotesByUser(userInfo.id).catch(() => []),
+      ]);
+      setUserData(userInfo);
+      setEditData({ name: userInfo.name || '', email: userInfo.email || '' });
+      setBets(betsData);
+      setVotes(votesData);
     } catch (error) {
       console.error('Error cargando perfil:', error);
-      setUserData(null);
-      // Mostrar error más descriptivo
-      if (error.message) {
-        alert('Error al cargar perfil: ' + error.message);
-      }
+      alert(error.message);
     } finally {
       setLoading(false);
     }
@@ -154,227 +85,145 @@ const Profile = () => {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // Validar tamaño (máximo 1MB para fotos de perfil)
-    if (file.size > 1024 * 1024) {
-      alert('La imagen es muy grande. Máximo 1MB.');
-      return;
-    }
-
+    if (file.size > 1024 * 1024) { alert('Imagen muy grande (máx 1MB)'); return; }
     try {
       setUploading(true);
-      // Convertir a base64
       const base64 = await fileToBase64(file);
-      
-      const userId = userData?.id || user?.id;
-      if (!userId) {
-        alert('Error: No se pudo identificar el usuario');
-        return;
-      }
-      await updateUserPhoto(userId, base64);
-      setUserData({ ...userData, photoURL: base64 });
-      alert('Foto actualizada exitosamente');
+      const uid = userData?.id || user?.id;
+      await updateUserPhoto(uid, base64);
+      setUserData(u => ({ ...u, photoURL: base64 }));
     } catch (error) {
-      alert('Error al procesar la imagen: ' + error.message);
-    } finally {
-      setUploading(false);
-    }
+      alert('Error al subir foto: ' + error.message);
+    } finally { setUploading(false); }
   };
 
-  const handleSaveProfile = async () => {
+  const handleSave = async () => {
     try {
-      const userId = userData?.id || user?.id;
-      if (!userId) {
-        alert('Error: No se pudo identificar el usuario');
-        return;
-      }
-
-      await updateUser(userId, {
-        name: editData.name || userData.username,
-        email: editData.email || ''
-      });
-      setUserData({ ...userData, name: editData.name, email: editData.email });
+      const uid = userData?.id || user?.id;
+      await updateUser(uid, { name: editData.name || userData.username, email: editData.email || '' });
+      setUserData(u => ({ ...u, name: editData.name, email: editData.email }));
       setEditing(false);
-      alert('Perfil actualizado exitosamente');
     } catch (error) {
-      console.error('Error actualizando perfil:', error);
-      alert('Error al actualizar perfil: ' + error.message);
+      alert('Error al actualizar: ' + error.message);
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditData({ name: userData.name || '', email: userData.email || '' });
-    setEditing(false);
-  };
+  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando perfil...</div>;
+  if (!userData) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>Error al cargar perfil</div>;
 
-  if (loading) {
-    return <div className="loading">Cargando perfil...</div>;
-  }
-
-  if (!userData) {
-    return <div className="error">Error al cargar perfil</div>;
-  }
-
-  const totalBetAmount = bets
-    .filter(bet => bet.status === 'confirmed')
-    .reduce((sum, bet) => sum + bet.amount, 0);
+  const totalBet = bets.filter(b => b.status === 'confirmed').reduce((s, b) => s + b.amount, 0);
+  const roleLabel = ROLE_LABELS[userData.userType || userData.role] || userData.userType || 'Usuario';
 
   return (
     <div className="profile-page">
-      <div className="profile-header">
-        <div className="profile-photo-section">
+      {/* Card de perfil */}
+      <div className="profile-card">
+        {/* Foto */}
+        <div className="profile-photo-wrap">
           <div className="profile-photo">
-            {userData.photoURL ? (
-              <img src={userData.photoURL} alt={userData.username} />
-            ) : (
-              <div className="photo-placeholder">
-                {userData.username.charAt(0).toUpperCase()}
-              </div>
-            )}
+            {userData.photoURL
+              ? <img src={userData.photoURL} alt={userData.username} />
+              : <div className="profile-photo-placeholder">{(userData.username || '?')[0].toUpperCase()}</div>
+            }
           </div>
-          <label className="upload-button">
-            <Upload size={20} />
-            {uploading ? 'Subiendo...' : 'Cambiar Foto'}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoUpload}
-              disabled={uploading}
-              style={{ display: 'none' }}
-            />
+          <label className="profile-photo-upload" title="Cambiar foto">
+            <Upload size={14} />
+            {uploading ? '...' : 'Foto'}
+            <input type="file" accept="image/*" onChange={handlePhotoUpload} disabled={uploading} style={{ display: 'none' }} />
           </label>
         </div>
 
+        {/* Info */}
         <div className="profile-info">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="profile-name-row">
             <h1>{userData.username}</h1>
             {!editing && (
-              <button 
-                onClick={() => setEditing(true)} 
-                className="btn-edit-profile"
-                title="Editar perfil"
-              >
-                <Edit2 size={18} />
+              <button className="btn-edit-profile" onClick={() => setEditing(true)} title="Editar">
+                <Edit2 size={15} />
               </button>
             )}
           </div>
-          <p className="user-type">{userData.userType}</p>
-          
+          <span className="profile-role-badge">{roleLabel}</span>
+
           {editing ? (
             <div className="edit-profile-form">
-              <div className="form-group">
-                <label>Nombre Completo</label>
-                <input
-                  type="text"
-                  value={editData.name}
-                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                  placeholder="Tu nombre completo"
-                />
-              </div>
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={editData.email}
-                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                  placeholder="tu@email.com"
-                />
-              </div>
+              <input
+                type="text"
+                value={editData.name}
+                onChange={e => setEditData(d => ({ ...d, name: e.target.value }))}
+                placeholder="Nombre completo"
+              />
+              <input
+                type="email"
+                value={editData.email}
+                onChange={e => setEditData(d => ({ ...d, email: e.target.value }))}
+                placeholder="Email"
+              />
               <div className="edit-actions">
-                <button onClick={handleSaveProfile} className="btn-save-profile">
-                  <Save size={16} />
-                  Guardar
-                </button>
-                <button onClick={handleCancelEdit} className="btn-cancel-profile">
-                  <X size={16} />
-                  Cancelar
-                </button>
+                <button onClick={handleSave} className="btn-save-profile"><Save size={14} /> Guardar</button>
+                <button onClick={() => setEditing(false)} className="btn-cancel-profile"><X size={14} /> Cancelar</button>
               </div>
             </div>
           ) : (
             <>
-              {userData.name && userData.name !== userData.username && (
-                <p className="full-name">{userData.name}</p>
-              )}
-              {userData.email && <p className="email">{userData.email}</p>}
+              {userData.name && userData.name !== userData.username && <p className="profile-fullname">{userData.name}</p>}
+              {userData.email && <p className="profile-email">{userData.email}</p>}
             </>
           )}
         </div>
       </div>
 
+      {/* Stats */}
       <div className="profile-stats">
-        <div className="stat-card">
-          <Heart size={24} />
-          <div>
-            <h3>{votes.length}</h3>
-            <p>Votos Realizados</p>
+        {[
+          { icon: <Heart size={18} />, value: votes.length, label: 'Votos' },
+          { icon: <DollarSign size={18} />, value: `$${totalBet.toFixed(0)}`, label: 'Apostado' },
+          { icon: <Award size={18} />, value: userData.badges?.length || 0, label: 'Insignias' },
+        ].map((s, i) => (
+          <div key={i} className="profile-stat-card">
+            <div className="profile-stat-icon">{s.icon}</div>
+            <div className="profile-stat-value">{s.value}</div>
+            <div className="profile-stat-label">{s.label}</div>
           </div>
-        </div>
-        <div className="stat-card">
-          <DollarSign size={24} />
-          <div>
-            <h3>${totalBetAmount.toFixed(2)}</h3>
-            <p>Total Apostado</p>
-          </div>
-        </div>
-        <div className="stat-card">
-          <Award size={24} />
-          <div>
-            <h3>{userData.badges?.length || 0}</h3>
-            <p>Insignias</p>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {userData.badges && userData.badges.length > 0 && (
-        <div className="badges-section">
-          <h2>
-            <Award size={24} />
-            Mis Insignias
-          </h2>
+      {/* Insignias */}
+      {userData.badges?.length > 0 && (
+        <div className="profile-section">
+          <h2 className="profile-section-title"><Award size={16} /> Insignias</h2>
           <div className="badges-grid">
-            {userData.badges.map((badge, index) => (
-              <div key={index} className="badge-card">
-                <div className="badge-icon-large">
-                  {iconMap[badge.icon] || '🏆'}
-                </div>
-                <h3>{badge.eventName}</h3>
-                <p>Posición: {badge.position}</p>
-                {badge.date && (
-                  <p className="badge-date">{new Date(badge.date).toLocaleDateString()}</p>
-                )}
+            {userData.badges.map((badge, i) => (
+              <div key={i} className="badge-card">
+                <div className="badge-icon-large">{badge.icon || '🏆'}</div>
+                <span>{badge.eventName || badge.name || badge}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="history-section">
-        <h2>
-          <History size={24} />
-          Historial de Apuestas
-        </h2>
-        <div className="bets-list">
-          {bets.length === 0 ? (
-            <p className="no-data">No has realizado apuestas aún</p>
-          ) : (
-            bets.map(bet => (
-              <div key={bet.id} className="bet-item">
-                <div className="bet-info">
-                  <span className="bet-amount">${bet.amount.toFixed(2)}</span>
-                  <span className={`bet-status ${bet.status}`}>
-                    {bet.status === 'pending' && 'Pendiente'}
-                    {bet.status === 'confirmed' && 'Confirmada'}
-                    {bet.status === 'paid_out' && 'Pagada'}
-                  </span>
+      {/* Historial de apuestas */}
+      <div className="profile-section">
+        <h2 className="profile-section-title"><DollarSign size={16} /> Historial de Apuestas</h2>
+        {bets.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No has realizado apuestas aún</p>
+        ) : (
+          <div className="bets-history">
+            {bets.slice().reverse().map(bet => {
+              const s = BET_STATUS[bet.status] || { label: bet.status, cls: 'pending' };
+              return (
+                <div key={bet.id} className="bet-history-row">
+                  <div className="bet-history-amount">${(bet.amount || 0).toFixed(0)}</div>
+                  <div className={`bet-history-status ${s.cls}`}>{s.label}</div>
+                  <div className="bet-history-date">
+                    {bet.createdAt?.toDate ? bet.createdAt.toDate().toLocaleDateString('es-ES') : '—'}
+                  </div>
                 </div>
-                <div className="bet-date">
-                  {bet.createdAt?.toDate ? bet.createdAt.toDate().toLocaleDateString() : 'N/A'}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
