@@ -219,6 +219,15 @@ const EventManagement = () => {
   };
 
   const handleSetWinner = async (event) => {
+    // Si es Modo E, redirigir al panel de rondas
+    if (event.competitionMode === 'RONDAS_INDEPENDIENTES') {
+      alert('Este evento usa Rondas Independientes. Usa el botón "Panel" para gestionar los ganadores por ronda.');
+      return;
+    }
+    // Protección: si ya tiene ganador, pedir confirmación
+    if (event.winnerId) {
+      if (!confirm(`Este evento ya tiene un ganador asignado. ¿Quieres cambiarlo?`)) return;
+    }
     try {
       const parts = await getEventParticipants(event.id);
       const withData = await Promise.all(parts.map(async p => {
@@ -226,14 +235,28 @@ const EventManagement = () => {
         catch { return { ...p, username: 'Desconocido' }; }
       }));
       const opts = withData.map((p, i) => `${i + 1}. ${p.username || p.name}`).join('\n');
-      const sel = prompt(`Selecciona el ganador:\n${opts}\n\nIngresa el número:`);
+      const sel = prompt(`Selecciona el ganador del evento:\n\n${opts}\n\nIngresa el número:`);
       if (!sel) return;
       const idx = parseInt(sel) - 1;
       if (idx >= 0 && idx < withData.length) {
-        await setEventWinner(event.id, withData[idx].userId, null);
-        alert('Ganador establecido');
+        const winner = withData[idx];
+        if (!confirm(`¿Declarar a "${winner.username}" como ganador? Esto notificará a todos los apostadores.`)) return;
+        await setEventWinner(event.id, winner.userId, null);
+        // Marcar evento como finalizado automáticamente
+        await updateEvent(event.id, { status: 'FINALIZADO' });
+        alert(`✓ Ganador: ${winner.username}. Evento marcado como FINALIZADO.`);
         loadData();
       }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  };
+
+  const handleFinalizeEvent = async (event) => {
+    if (!confirm(`¿Finalizar el evento "${event.name}"? Cambiará su estado a FINALIZADO y ya no se podrá apostar.`)) return;
+    try {
+      await updateEvent(event.id, { status: 'FINALIZADO' });
+      loadData();
     } catch (error) {
       alert('Error: ' + error.message);
     }
@@ -306,23 +329,45 @@ const EventManagement = () => {
                   >
                     <Users size={12} /> Participantes
                   </button>
-                  <button
-                    className="btn-table-action btn-table-neutral"
-                    onClick={() => navigate(`/admin/events/${event.id}/brackets`)}
-                  >
-                    <Trophy size={12} /> Brackets
-                  </button>
-                  {!event.participantsListClosed && (
-                    <button className="btn-table-action btn-table-success" onClick={() => handleGenerateBracket(event)}>
-                      <Lock size={12} /> Generar Bracket
+                  {/* Brackets solo para modos que lo necesitan */}
+                  {['BRACKET_TORNEO', 'MULTI_FASE', '1v1', '2v2'].includes(event.competitionMode || event.bracketType) && (
+                    <>
+                      <button
+                        className="btn-table-action btn-table-neutral"
+                        onClick={() => navigate(`/admin/events/${event.id}/brackets`)}
+                      >
+                        <Trophy size={12} /> Brackets
+                      </button>
+                      {!event.participantsListClosed && (
+                        <button className="btn-table-action btn-table-success" onClick={() => handleGenerateBracket(event)}>
+                          <Lock size={12} /> Generar
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {/* Ganador solo si no es Modo E y el evento está activo/en curso */}
+                  {event.competitionMode !== 'RONDAS_INDEPENDIENTES' &&
+                   ['active', 'ACTIVO', 'EN_CURSO'].includes(event.status) && (
+                    <button
+                      className="btn-table-action btn-table-success"
+                      onClick={() => handleSetWinner(event)}
+                      title={event.winnerId ? 'Ya tiene ganador — clic para cambiar' : 'Declarar ganador'}
+                    >
+                      <Trophy size={12} /> {event.winnerId ? '✓ Ganador' : 'Ganador'}
                     </button>
                   )}
-                  {(event.status === 'active' || event.status === 'ACTIVO' || event.status === 'EN_CURSO') && (
-                    <button className="btn-table-action btn-table-success" onClick={() => handleSetWinner(event)}>
-                      <Trophy size={12} /> Ganador
+                  {/* Finalizar evento */}
+                  {!['FINALIZADO', 'finished', 'CANCELADO'].includes(event.status) && (
+                    <button
+                      className="btn-table-action btn-table-danger"
+                      onClick={() => handleFinalizeEvent(event)}
+                      title="Finalizar evento (sin eliminar)"
+                      style={{ borderColor: 'rgba(122,107,45,0.5)', color: '#D4A44C' }}
+                    >
+                      Finalizar
                     </button>
                   )}
-                  <button className="btn-table-action btn-table-danger" onClick={() => handleDeleteEvent(event.id)}>
+                  <button className="btn-table-action btn-table-danger" onClick={() => handleDeleteEvent(event.id)} title="Eliminar evento">
                     <Trash2 size={12} />
                   </button>
                 </div>

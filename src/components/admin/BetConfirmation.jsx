@@ -3,6 +3,7 @@ import { getPendingBets, confirmBet, getBetsByEvent } from '../../services/bets'
 import { getUserById } from '../../services/users';
 import { useAuth } from '../../context/AuthContext';
 import { getAllEvents } from '../../services/events';
+import { calculateWinnerPayouts } from '../../utils/prizeCalculator';
 import { Check, DollarSign, Clock, TrendingUp, RefreshCw } from 'lucide-react';
 import './admin-shared.css';
 import './BetConfirmation.css';
@@ -13,12 +14,13 @@ const BetConfirmation = () => {
   const [loading, setLoading] = useState(true);
   const [totalPot, setTotalPot] = useState(0);
   const [eventPots, setEventPots] = useState({});
+  const [winnerPayouts, setWinnerPayouts] = useState([]); // Pagos pendientes a ganadores
 
   useEffect(() => { loadAll(); }, []);
 
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadPendingBets(), loadTotalPot()]);
+    await Promise.all([loadPendingBets(), loadTotalPot(), loadWinnerPayouts()]);
     setLoading(false);
   };
 
@@ -56,6 +58,29 @@ const BetConfirmation = () => {
       setEventPots(pots);
     } catch (error) {
       console.error('Error cargando botes:', error);
+    }
+  };
+
+  const loadWinnerPayouts = async () => {
+    try {
+      const events = await getAllEvents();
+      const finishedWithWinner = events.filter(ev =>
+        ['FINALIZADO', 'finished'].includes(ev.status) && ev.winnerId
+      );
+      const payouts = [];
+      for (const ev of finishedWithWinner) {
+        const bets = await getBetsByEvent(ev.id).catch(() => []);
+        const confirmed = bets.filter(b => b.status === 'confirmed');
+        const commission = ev.commissionPercent || ev.houseCommission || 10;
+        const rows = calculateWinnerPayouts(confirmed, ev.winnerId, commission);
+        for (const row of rows) {
+          const bettor = await getUserById(row.userId).catch(() => ({ username: row.userId }));
+          payouts.push({ ...row, eventName: ev.name, username: bettor.username });
+        }
+      }
+      setWinnerPayouts(payouts);
+    } catch (e) {
+      console.warn('Error cargando pagos ganadores:', e);
     }
   };
 
@@ -106,6 +131,44 @@ const BetConfirmation = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Sección: Pagos a ganadores (eventos finalizados) */}
+      {winnerPayouts.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <p style={{ fontSize: '0.75rem', color: '#CF6679', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12, fontFamily: 'Cinzel, serif', fontWeight: 700 }}>
+            💳 Pagos pendientes a ganadores (debes pagarles IC en el juego)
+          </p>
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Evento</th>
+                  <th>Apostó</th>
+                  <th>Debe cobrar IC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {winnerPayouts.map((p, i) => (
+                  <tr key={i}>
+                    <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{p.username}</td>
+                    <td style={{ color: 'var(--text-muted)' }}>{p.eventName}</td>
+                    <td style={{ color: 'var(--text-muted)' }}>${(p.betAmount || 0).toLocaleString()}</td>
+                    <td>
+                      <span style={{ fontFamily: 'Cinzel, serif', fontWeight: 700, color: '#4CAF7A', fontSize: '1rem' }}>
+                        ${(p.payout || 0).toLocaleString()}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8 }}>
+            * El pago es proporcional al pozo. La suma de todos los pagos = pozo neto (nunca excede lo recaudado).
+          </p>
         </div>
       )}
 

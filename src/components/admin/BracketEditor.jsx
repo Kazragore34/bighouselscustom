@@ -39,9 +39,10 @@ const BracketEditor = () => {
       }
       setPData(map);
 
+      // Empezar en la primera ronda con matches pendientes (o la última si todas resueltas)
       if (filtered.length > 0) {
-        const last = filtered[filtered.length - 1];
-        setRound(last.matches.some(m => m.status === 'pending') ? filtered.length : Math.max(1, filtered.length - 1));
+        const firstPending = filtered.findIndex(b => b.matches.some(m => m.status === 'pending'));
+        setRound(firstPending >= 0 ? firstPending + 1 : filtered.length);
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -107,24 +108,28 @@ const BracketEditor = () => {
       {brackets.length > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ronda:</span>
-          {brackets.map((b, i) => (
-            <button
-              key={i}
-              onClick={() => setRound(i + 1)}
-              style={{
-                padding: '5px 14px',
-                borderRadius: 6,
-                border: round === i + 1 ? '1px solid var(--gold-primary)' : '1px solid var(--border-gold)',
-                background: round === i + 1 ? 'var(--gold-glow)' : 'transparent',
-                color: round === i + 1 ? 'var(--gold-primary)' : 'var(--text-muted)',
-                cursor: 'pointer',
-                fontSize: '0.82rem',
-                fontFamily: 'Cinzel, serif',
-              }}
-            >
-              {b.isFinal ? '◈ Final' : `R${i + 1}`}
-            </button>
-          ))}
+          {brackets.map((b, i) => {
+            // Solo la última ronda (o la que tenga 1 match y sea la última) se llama "Final"
+            const isActualFinal = i === brackets.length - 1 && b.matches?.length === 1;
+            return (
+              <button
+                key={i}
+                onClick={() => setRound(i + 1)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: 6,
+                  border: round === i + 1 ? '1px solid var(--gold-primary)' : '1px solid var(--border-gold)',
+                  background: round === i + 1 ? 'var(--gold-glow)' : 'transparent',
+                  color: round === i + 1 ? 'var(--gold-primary)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '0.82rem',
+                  fontFamily: 'Cinzel, serif',
+                }}
+              >
+                {isActualFinal ? '◈ Final' : `R${i + 1}`}
+              </button>
+            );
+          })}
         </div>
       )}
 

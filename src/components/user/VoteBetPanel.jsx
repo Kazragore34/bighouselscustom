@@ -5,7 +5,7 @@ import { getBracketsByEvent } from '../../services/brackets';
 import { getUserById } from '../../services/users';
 import { createVote, hasUserVoted, getVoteCountsByEvent } from '../../services/votes';
 import { createBet } from '../../services/bets';
-import { calculateOdds } from '../../utils/prizeCalculator';
+import { calculateOdds, calculateEstimatedPayout } from '../../utils/prizeCalculator';
 import { useAuth } from '../../context/AuthContext';
 import PaymentModal from '../shared/PaymentModal';
 import BetsModal from './BetsModal';
@@ -15,6 +15,27 @@ import { db } from '../../services/firebase';
 import './VoteBetPanel.css';
 
 const BLOCKED_ROLES = ['PENDIENTE_VERIFICACION', 'SOLO_VISUALIZAR', 'NO_PARTICIPA'];
+
+// Muestra la ganancia estimada real (parimutuel) para el monto ingresado
+const PayoutPreview = ({ eventId, participantId, betAmount }) => {
+  const [payout, setPayout] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    calculateEstimatedPayout(eventId, participantId, betAmount).then(r => {
+      if (!cancelled) setPayout(r);
+    });
+    return () => { cancelled = true; };
+  }, [eventId, participantId, betAmount]);
+
+  if (!payout) return null;
+  return (
+    <div className="payout-preview">
+      <Trophy size={12} />
+      Estimado si gana: <strong>${payout.estimatedPayout.toLocaleString()}</strong>
+      <span style={{ fontSize: '0.7rem', opacity: 0.7 }}> (pozo neto: ${payout.netPool.toLocaleString()})</span>
+    </div>
+  );
+};
 
 const VoteBetPanel = () => {
   const { eventId } = useParams();
@@ -231,11 +252,13 @@ const VoteBetPanel = () => {
                     </div>
                   )}
 
-                  {/* Ganancia potencial */}
+                  {/* Ganancia estimada — calculada con fórmula parimutuel real */}
                   {betAmounts[p.userId] && parseFloat(betAmounts[p.userId]) > 0 && (
-                    <div className="payout-preview">
-                      <Trophy size={12} /> Ganarías: ${(parseFloat(betAmounts[p.userId]) * odds.payoutMultiplier).toFixed(0)}
-                    </div>
+                    <PayoutPreview
+                      eventId={eventId}
+                      participantId={p.userId}
+                      betAmount={parseFloat(betAmounts[p.userId])}
+                    />
                   )}
 
                   {/* Resumen de mis apuestas */}

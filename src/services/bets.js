@@ -27,7 +27,7 @@ export const createBet = async (eventId, userId, participantId, amount, maxBetPe
       }
     }
 
-    // Crear la apuesta con estado pendiente (permitir múltiples apuestas)
+    // Crear la apuesta con estado pendiente
     const newBetRef = doc(collection(db, 'bets'));
     await setDoc(newBetRef, {
       eventId,
@@ -35,10 +35,35 @@ export const createBet = async (eventId, userId, participantId, amount, maxBetPe
       participantId,
       amount: betAmount,
       status: 'pending',
+      roundNumber: null,
       createdAt: serverTimestamp(),
       confirmedBy: null,
       confirmedAt: null
     });
+
+    // Notificar a todos los admins que hay una apuesta pendiente de confirmar
+    try {
+      const { getAllUsers } = await import('./users');
+      const { createNotification } = await import('./notifications');
+      const { getUserById } = await import('./users');
+      const [allUsers, bettor, participant] = await Promise.all([
+        getAllUsers(),
+        getUserById(userId).catch(() => ({ username: 'Usuario' })),
+        getUserById(participantId).catch(() => ({ username: 'participante' })),
+      ]);
+      const admins = allUsers.filter(u => u.userType === 'ADMIN' || u.role === 'ADMIN');
+      await Promise.all(admins.map(admin =>
+        createNotification(
+          admin.id,
+          'apuesta_pendiente',
+          'Nueva apuesta pendiente 💰',
+          `${bettor.username} apostó $${betAmount} en ${participant.username}. Confirma el pago IC.`,
+          { eventId, betId: newBetRef.id }
+        ).catch(() => {})
+      ));
+    } catch (e) {
+      console.warn('Error notificando admin de apuesta:', e);
+    }
 
     return newBetRef.id;
   } catch (error) {

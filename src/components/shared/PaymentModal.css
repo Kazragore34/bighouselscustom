@@ -1,45 +1,25 @@
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  padding: 20px;
+  animation: fadeIn 0.25s ease;
 }
 
 .modal-content {
-  background: white;
-  border-radius: 20px;
-  padding: 30px;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 16px;
+  padding: 32px 28px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px var(--border-gold);
+  animation: fadeIn 0.25s ease;
 }
 
 .modal-header {
@@ -48,33 +28,35 @@
 }
 
 .alert-icon {
-  color: #ff9800;
-  margin-bottom: 15px;
+  color: var(--gold-primary);
+  margin-bottom: 12px;
 }
 
 .modal-header h2 {
   margin: 0;
-  color: #333;
-  font-size: 1.8rem;
+  font-family: 'Cinzel', serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--gold-primary);
+  letter-spacing: 0.06em;
 }
 
 .modal-body {
-  margin-bottom: 25px;
+  margin-bottom: 24px;
+  text-align: center;
 }
 
 .payment-message {
-  font-size: 1.2rem;
-  color: #333;
-  text-align: center;
-  margin-bottom: 15px;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 12px;
   line-height: 1.6;
 }
 
 .payment-info {
-  color: #666;
-  text-align: center;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
 }
 
 .modal-footer {
@@ -83,18 +65,21 @@
 }
 
 .modal-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  color: #0a0a0a;
   border: none;
-  padding: 12px 30px;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 11px 32px;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  letter-spacing: 0.04em;
 }
 
 .modal-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, var(--gold-primary), var(--gold-light));
+  box-shadow: 0 4px 16px var(--gold-glow-strong);
+  transform: translateY(-1px);
 }

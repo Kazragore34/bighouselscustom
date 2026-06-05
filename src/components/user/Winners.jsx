@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllEvents } from '../../services/events';
 import { getVoteCountsByEvent } from '../../services/votes';
-import { getBetsByUser } from '../../services/bets';
+// getBetsByUser ya no se usa directamente — se importa dinámicamente en loadData
 import { getAllUsers, getUserById } from '../../services/users';
 import { Trophy, Star, Target, DollarSign } from 'lucide-react';
 import './Winners.css';
@@ -24,29 +24,40 @@ const Winners = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [allEvents, allUsers] = await Promise.all([getAllEvents(), getAllUsers()]);
+      const allEvents = await getAllEvents();
       const finished = allEvents.filter(e => ['finished', 'FINALIZADO', 'completed'].includes(e.status));
 
-      // --- Tab 1: Dinero ganado (apuestas GANADORA por usuario) ---
-      const dineroMap = {};
-      for (const user of allUsers) {
+      // --- Tab 1: Dinero ganado — usar calculateWinnerPayouts para precisión ---
+      // (los status GANADORA/won no se graban automáticamente aún, calculamos desde eventos finalizados)
+      const dineroMapFromEvents = {};
+      for (const ev of finished) {
+        if (!ev.winnerId) continue;
         try {
-          const bets = await getBetsByUser(user.id).catch(() => []);
-          const won = bets.filter(b => b.status === 'GANADORA' || b.status === 'won');
-          if (won.length > 0) {
-            dineroMap[user.id] = {
-              ...user,
-              totalGanado: won.reduce((s, b) => s + (b.payoutAmount || b.amount || 0), 0),
-              apuestasGanadas: won.length,
-            };
+          const { getBetsByEvent } = await import('../../services/bets');
+          const { calculateWinnerPayouts } = await import('../../utils/prizeCalculator');
+          const bets = await getBetsByEvent(ev.id).catch(() => []);
+          const confirmed = bets.filter(b => b.status === 'confirmed');
+          const commission = ev.commissionPercent || ev.houseCommission || 10;
+          const rows = calculateWinnerPayouts(confirmed, ev.winnerId, commission);
+          for (const row of rows) {
+            if (!dineroMapFromEvents[row.userId]) {
+              dineroMapFromEvents[row.userId] = { totalGanado: 0, apuestasGanadas: 0 };
+            }
+            dineroMapFromEvents[row.userId].totalGanado += row.payout;
+            dineroMapFromEvents[row.userId].apuestasGanadas++;
           }
         } catch {}
       }
-      setRankingDinero(
-        Object.values(dineroMap)
-          .sort((a, b) => b.totalGanado - a.totalGanado)
+      const dineroWithUser = await Promise.all(
+        Object.entries(dineroMapFromEvents)
+          .sort(([, a], [, b]) => b.totalGanado - a.totalGanado)
           .slice(0, 20)
+          .map(async ([userId, v]) => {
+            const u = await getUserById(userId).catch(() => ({ username: userId }));
+            return { ...u, ...v };
+          })
       );
+      setRankingDinero(dineroWithUser);
 
       // --- Tab 2: Victorias como participante ---
       const victoriasMap = {};

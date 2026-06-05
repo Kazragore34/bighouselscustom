@@ -90,7 +90,10 @@ const BracketViewer = () => {
         {brackets.map((bracket, bi) => (
           <div key={bracket.id || bi} className="bracket-round">
             <h3 className="round-title">
-              {bracket.isFinal ? '◈ Final' : `Ronda ${bracket.round}`}
+              {(bi === brackets.length - 1 && bracket.matches?.length === 1)
+                ? '◈ Final'
+                : `Ronda ${bracket.round || bi + 1}`
+              }
             </h3>
             <div className="matches-container">
               {bracket.matches?.map((match, mi) => (

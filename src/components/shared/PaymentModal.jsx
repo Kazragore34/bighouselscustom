@@ -14,10 +14,10 @@ const PaymentModal = ({ isOpen, onClose }) => {
         
         <div className="modal-body">
           <p className="payment-message">
-            <strong>¡Acérquese al taller para poder pagar la apuesta!</strong>
+            <strong>¡Apuesta registrada! Ahora debes pagar IC al admin del evento.</strong>
           </p>
           <p className="payment-info">
-            Su apuesta quedará en estado pendiente hasta que el administrador confirme el pago.
+            Tu apuesta quedará en estado <strong>pendiente</strong> hasta que el administrador confirme que recibió el pago en el juego.
           </p>
         </div>
 
