@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { getAvailableTeamsForEvent } from '../../services/teams';
 import { addParticipantsToEvent, addTeamToEvent, getEventParticipants, removeParticipantsFromEvent } from '../../services/events';
-import { getAllUsers, getUserById } from '../../services/users';
-import { Search, Users, X, Plus, Trash2 } from 'lucide-react';
+import { getAllUsers } from '../../services/users';
+import { Search, X, Plus, Trash2 } from 'lucide-react';
 import './ParticipantsModal.css';
 
 const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
@@ -11,19 +11,17 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
   const [users, setUsers] = useState([]);
   const [availableTeams, setAvailableTeams] = useState([]);
   const [eventParticipants, setEventParticipants] = useState([]);
-  const [teams, setTeams] = useState([]); // Equipos creados en este modal
-  const [selectedUserIds, setSelectedUserIds] = useState(new Set()); // Para eventos individuales
+  const [teams, setTeams] = useState([]);
+  const [selectedUserIds, setSelectedUserIds] = useState(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen && event) {
-      // Resetear estado cuando se abre el modal
       setSelectedUserIds(new Set());
       setEventParticipants([]);
       setTeams([]);
       loadData();
     } else if (!isOpen) {
-      // Limpiar estado cuando se cierra el modal
       setSelectedUserIds(new Set());
       setEventParticipants([]);
       setTeams([]);
@@ -34,251 +32,116 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const isTeamEvent = event.bracketType === '2v2' || event.bracketType === 'custom';
-      const requiredMembers = event.participantsPerBracket || 2;
+      const isTeamEvent = event.isTeamEvent || event.bracketType === '2v2' || event.bracketType === 'custom';
+      const requiredMembers = event.teamSize || event.participantsPerBracket || 2;
 
-      // Cargar datos en paralelo
       const [usersData, participantsData] = await Promise.all([
         getAllUsers(),
         getEventParticipants(event.id)
       ]);
 
-      // Filtrar solo usuarios PARTICIPANTE y crear mapa para acceso rápido
-      const participantUsers = usersData.filter(u => u.enabled && u.userType === 'PARTICIPANTE');
+      // Aceptar APOSTADOR, PARTICIPANTE, VOTANTE_APOSTADOR y ADMIN como posibles participantes
+      const ALLOWED_ROLES = ['APOSTADOR', 'PARTICIPANTE', 'VOTANTE_APOSTADOR', 'ADMIN'];
+      const participantUsers = usersData.filter(u =>
+        u.enabled !== false && ALLOWED_ROLES.includes(u.userType || u.role)
+      );
       const usersMap = new Map(participantUsers.map(u => [u.id, u]));
       setUsers(participantUsers);
 
-      // Optimizar: usar el mapa en lugar de hacer llamadas individuales a Firestore
-      const participantsWithData = participantsData.map((p) => {
-        const userData = usersMap.get(p.userId);
-        return userData 
-          ? { ...p, ...userData }
-          : { ...p, username: 'Usuario no encontrado' };
+      const participantsWithData = participantsData.map(p => {
+        const ud = usersMap.get(p.userId);
+        return ud ? { ...p, ...ud } : { ...p, username: 'Usuario no encontrado' };
       });
       setEventParticipants(participantsWithData);
 
-      // Para eventos individuales, inicializar checkboxes con participantes existentes
       if (!isTeamEvent) {
-        const existingParticipantIds = new Set(participantsData.map(p => p.userId).filter(Boolean));
-        console.log('Inicializando checkboxes con participantes:', Array.from(existingParticipantIds));
-        setSelectedUserIds(existingParticipantIds);
+        setSelectedUserIds(new Set(participantsData.map(p => p.userId).filter(Boolean)));
       }
 
-      // Si es evento por equipos
       if (isTeamEvent) {
-        // Cargar equipos disponibles en paralelo
-        const [teamsData, existingTeams] = await Promise.all([
-          getAvailableTeamsForEvent(requiredMembers),
-          Promise.resolve(groupParticipantsIntoTeams(participantsWithData, requiredMembers))
-        ]);
-        
+        const teamsData = await getAvailableTeamsForEvent(requiredMembers).catch(() => []);
         setAvailableTeams(teamsData);
+        const existingTeams = groupIntoTeams(participantsWithData, requiredMembers);
         setTeams(existingTeams.length > 0 ? existingTeams : [{ id: 'team-1', name: 'Equipo 1', members: [] }]);
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
-      alert('Error al cargar datos');
     } finally {
       setLoading(false);
     }
   };
 
-  // Agrupar participantes existentes en equipos
-  const groupParticipantsIntoTeams = (participants, membersPerTeam) => {
-    const teams = [];
-    const usedParticipantIds = new Set();
-
-    for (let i = 0; i < participants.length; i += membersPerTeam) {
-      const teamMembers = participants.slice(i, i + membersPerTeam);
-      if (teamMembers.length === membersPerTeam) {
-        teams.push({
-          id: `team-${teams.length + 1}`,
-          name: `Equipo ${teams.length + 1}`,
-          members: teamMembers.map(p => p.userId)
-        });
-        teamMembers.forEach(p => usedParticipantIds.add(p.userId));
+  const groupIntoTeams = (participants, size) => {
+    const result = [];
+    for (let i = 0; i < participants.length; i += size) {
+      const slice = participants.slice(i, i + size);
+      if (slice.length === size) {
+        result.push({ id: `team-${result.length + 1}`, name: `Equipo ${result.length + 1}`, members: slice.map(p => p.userId) });
       }
     }
-
-    return teams;
+    return result;
   };
 
-  // Memoizar cálculos pesados para evitar recalcular en cada render
   const assignedUserIds = useMemo(() => {
-    const assigned = new Set();
-    teams.forEach(team => {
-      team.members.forEach(userId => assigned.add(userId));
-    });
-    eventParticipants.forEach(p => assigned.add(p.userId));
-    return assigned;
+    const s = new Set();
+    teams.forEach(t => t.members.forEach(id => s.add(id)));
+    eventParticipants.forEach(p => s.add(p.userId));
+    return s;
   }, [teams, eventParticipants]);
 
   const filteredUsers = useMemo(() => {
-    const searchLower = searchTerm.toLowerCase();
+    const q = searchTerm.toLowerCase();
     return users.filter(u =>
       !assignedUserIds.has(u.id) &&
-      (u.username?.toLowerCase().includes(searchLower) ||
-       u.name?.toLowerCase().includes(searchLower))
+      (u.username?.toLowerCase().includes(q) || u.name?.toLowerCase().includes(q))
     );
   }, [users, assignedUserIds, searchTerm]);
 
-  // Memoizar mapa de usuarios para acceso rápido
-  const usersMap = useMemo(() => {
-    return new Map(users.map(u => [u.id, u]));
-  }, [users]);
+  const usersMap = useMemo(() => new Map(users.map(u => [u.id, u])), [users]);
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
-
     const { source, destination, draggableId } = result;
+    const isTeam = event.isTeamEvent || event.bracketType === '2v2';
+    if (!isTeam) return;
+    const required = event.teamSize || event.participantsPerBracket || 2;
 
-    // Si es evento por equipos
-    if (event.bracketType === '2v2' || event.bracketType === 'custom') {
-      const requiredMembers = event.participantsPerBracket || 2;
-
-      // Si viene de la lista de usuarios disponibles
-      if (source.droppableId === 'available-users') {
-        const userId = draggableId;
-        const targetTeamId = destination.droppableId;
-
-        // Agregar usuario al equipo
-        setTeams(prevTeams => {
-          const newTeams = [...prevTeams];
-          const teamIndex = newTeams.findIndex(t => t.id === targetTeamId);
-          
-          if (teamIndex !== -1) {
-            const team = { ...newTeams[teamIndex] };
-            if (!team.members.includes(userId) && team.members.length < requiredMembers) {
-              team.members = [...team.members, userId];
-              newTeams[teamIndex] = team;
-            }
-          }
-          
-          return newTeams;
-        });
-      }
-      // Si se mueve entre equipos
-      else if (source.droppableId.startsWith('team-') && destination.droppableId.startsWith('team-')) {
-        const userId = draggableId;
-        const sourceTeamId = source.droppableId;
-        const destTeamId = destination.droppableId;
-
-        setTeams(prevTeams => {
-          const newTeams = [...prevTeams];
-          const sourceTeamIndex = newTeams.findIndex(t => t.id === sourceTeamId);
-          const destTeamIndex = newTeams.findIndex(t => t.id === destTeamId);
-
-          if (sourceTeamIndex !== -1 && destTeamIndex !== -1) {
-            const sourceTeam = { ...newTeams[sourceTeamIndex] };
-            const destTeam = { ...newTeams[destTeamIndex] };
-
-            if (destTeam.members.length < requiredMembers) {
-              sourceTeam.members = sourceTeam.members.filter(id => id !== userId);
-              destTeam.members = [...destTeam.members, userId];
-              
-              newTeams[sourceTeamIndex] = sourceTeam;
-              newTeams[destTeamIndex] = destTeam;
-            }
-          }
-
-          return newTeams;
-        });
-      }
-      // Si se elimina de un equipo (arrastrar fuera)
-      else if (source.droppableId.startsWith('team-') && destination.droppableId === 'remove-zone') {
-        const userId = draggableId;
-        const sourceTeamId = source.droppableId;
-
-        setTeams(prevTeams => {
-          const newTeams = [...prevTeams];
-          const teamIndex = newTeams.findIndex(t => t.id === sourceTeamId);
-          
-          if (teamIndex !== -1) {
-            const team = { ...newTeams[teamIndex] };
-            team.members = team.members.filter(id => id !== userId);
-            newTeams[teamIndex] = team;
-          }
-          
-          return newTeams;
-        });
-      }
+    if (source.droppableId === 'available-users') {
+      setTeams(prev => prev.map(t => {
+        if (t.id === destination.droppableId && !t.members.includes(draggableId) && t.members.length < required) {
+          return { ...t, members: [...t.members, draggableId] };
+        }
+        return t;
+      }));
+    } else if (source.droppableId.startsWith('team-') && destination.droppableId.startsWith('team-') && source.droppableId !== destination.droppableId) {
+      setTeams(prev => prev.map(t => {
+        if (t.id === source.droppableId) return { ...t, members: t.members.filter(id => id !== draggableId) };
+        if (t.id === destination.droppableId && t.members.length < required) return { ...t, members: [...t.members, draggableId] };
+        return t;
+      }));
+    } else if (source.droppableId.startsWith('team-') && destination.droppableId === 'remove-zone') {
+      setTeams(prev => prev.map(t => t.id === source.droppableId ? { ...t, members: t.members.filter(id => id !== draggableId) } : t));
     }
-  };
-
-  const handleAddTeam = () => {
-    const newTeamId = `team-${teams.length + 1}`;
-    setTeams([...teams, { id: newTeamId, name: `Equipo ${teams.length + 1}`, members: [] }]);
-  };
-
-  const handleRemoveTeam = (teamId) => {
-    setTeams(teams.filter(t => t.id !== teamId));
   };
 
   const handleSave = async () => {
     try {
       setLoading(true);
+      const isTeam = event.isTeamEvent || event.bracketType === '2v2';
 
-      if (event.bracketType === '2v2' || event.bracketType === 'custom') {
-        // Guardar equipos
-        const participantsToAdd = [];
-        
-        for (const team of teams) {
-          if (team.members.length === (event.participantsPerBracket || 2)) {
-            // Agregar cada miembro del equipo
-            team.members.forEach(userId => {
-              participantsToAdd.push({ userId, teamId: team.id });
-            });
-          }
-        }
-
-        if (participantsToAdd.length > 0) {
-          await addParticipantsToEvent(event.id, participantsToAdd);
-        }
+      if (isTeam) {
+        const toAdd = [];
+        teams.forEach(t => t.members.forEach(uid => toAdd.push({ userId: uid, teamId: t.id })));
+        if (toAdd.length > 0) await addParticipantsToEvent(event.id, toAdd);
       } else {
-        // Evento individual - guardar participantes seleccionados con checkboxes
-        const currentParticipantIds = new Set(eventParticipants.map(p => p.userId));
-        const selectedIds = Array.from(selectedUserIds);
-        
-        // Identificar participantes a agregar (están seleccionados pero no están en el evento)
-        const toAdd = selectedIds.filter(userId => !currentParticipantIds.has(userId));
-        
-        // Identificar participantes a eliminar (están en el evento pero no están seleccionados)
-        const toRemove = Array.from(currentParticipantIds).filter(userId => !selectedUserIds.has(userId));
-        
-        // Agregar nuevos participantes
-        if (toAdd.length > 0) {
-          console.log('Agregando participantes:', toAdd);
-          const newParticipants = toAdd.map(userId => ({ userId }));
-          try {
-            await addParticipantsToEvent(event.id, newParticipants);
-            console.log('Participantes agregados exitosamente');
-          } catch (error) {
-            console.error('Error agregando participantes:', error);
-            throw error;
-          }
-        }
-        
-        // Eliminar participantes deseleccionados
-        if (toRemove.length > 0) {
-          console.log('Eliminando participantes:', toRemove);
-          try {
-            await removeParticipantsFromEvent(event.id, toRemove);
-            console.log('Participantes eliminados exitosamente');
-          } catch (error) {
-            console.error('Error eliminando participantes:', error);
-            throw error;
-          }
-        }
-        
-        // Si no hay cambios, mostrar mensaje
-        if (toAdd.length === 0 && toRemove.length === 0) {
-          console.log('No hay cambios en los participantes');
-        }
+        const current = new Set(eventParticipants.map(p => p.userId));
+        const toAdd = [...selectedUserIds].filter(id => !current.has(id)).map(id => ({ userId: id }));
+        const toRemove = [...current].filter(id => !selectedUserIds.has(id));
+        if (toAdd.length > 0) await addParticipantsToEvent(event.id, toAdd);
+        if (toRemove.length > 0) await removeParticipantsFromEvent(event.id, toRemove);
       }
 
-      // Recargar datos antes de cerrar para asegurar consistencia
       await loadData();
-      alert('Participantes guardados exitosamente');
       if (onUpdate) onUpdate();
       onClose();
     } catch (error) {
@@ -288,198 +151,123 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
     }
   };
 
-  const handleAddAvailableTeam = async (teamId) => {
-    try {
-      await addTeamToEvent(event.id, teamId);
-      alert('Equipo agregado exitosamente');
-      loadData();
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      alert('Error al agregar equipo: ' + error.message);
-    }
-  };
-
   if (!isOpen) return null;
 
-  const isTeamEvent = event.bracketType === '2v2' || event.bracketType === 'custom';
-  const requiredMembers = event.participantsPerBracket || 2;
+  const isTeamEvent = event.isTeamEvent || event.bracketType === '2v2' || event.bracketType === 'custom';
+  const required = event.teamSize || event.participantsPerBracket || 2;
+
+  const Avatar = ({ user }) => user?.photoURL
+    ? <img src={user.photoURL} alt="" />
+    : <div className="pm-chip-avatar">{(user?.username || '?')[0].toUpperCase()}</div>;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content participants-modal-large" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Gestionar Participantes - {event.name}</h2>
-          <button onClick={onClose} className="btn-close">
-            <X size={20} />
-          </button>
+    <div className="participants-modal-overlay" onClick={onClose}>
+      <div className="participants-modal-box" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="pm-header">
+          <h2>Participantes — {event.name}</h2>
+          <button onClick={onClose} className="pm-close"><X size={18} /></button>
         </div>
 
         {loading ? (
-          <div className="loading">Cargando...</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando...</div>
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="participants-modal-content">
-              {/* Equipos Disponibles (solo para eventos por equipos) */}
-              {isTeamEvent && availableTeams.length > 0 && (
-                <div className="available-teams-section">
-                  <h3>Equipos Disponibles</h3>
-                  <div className="teams-grid">
-                    {availableTeams.map(team => (
-                      <div key={team.id} className="available-team-card">
-                        <h4>{team.name}</h4>
-                        <div className="team-members-preview">
-                          {team.members.slice(0, 3).map(memberId => {
-                            const member = usersMap.get(memberId);
-                            return (
-                              <span key={memberId} className="member-tag">
-                                {member?.username || memberId}
-                              </span>
-                            );
-                          })}
-                          {team.members.length > 3 && <span>+{team.members.length - 3}</span>}
-                        </div>
-                        <button
-                          onClick={() => handleAddAvailableTeam(team.id)}
-                          className="btn-add-team"
-                        >
-                          Agregar Equipo
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Vista por Equipos */}
-              {isTeamEvent ? (
-                <div className="teams-view">
-                  <div className="teams-header">
-                    <h3>Equipos del Evento</h3>
-                    <button onClick={handleAddTeam} className="btn-add-team-small">
-                      <Plus size={16} />
-                      Agregar Equipo
-                    </button>
-                  </div>
-                  
-                  <div className="teams-container-scroll">
-                    <div className="teams-container">
-                    {teams.map((team, teamIndex) => (
-                      <Droppable key={team.id} droppableId={team.id}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`team-drop-zone ${snapshot.isDraggingOver ? 'dragging-over' : ''} ${
-                              team.members.length === requiredMembers ? 'complete' : 'incomplete'
-                            }`}
-                          >
-                            <div className="team-header">
-                              <h4>{team.name}</h4>
-                              {teams.length > 1 && (
-                                <button
-                                  onClick={() => handleRemoveTeam(team.id)}
-                                  className="btn-remove-team"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-                            <div className="team-members-drop">
-                              {team.members.map((userId, index) => {
-                                const user = usersMap.get(userId);
-                                return (
-                                  <Draggable key={userId} draggableId={userId} index={index}>
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        className={`draggable-member ${snapshot.isDragging ? 'dragging' : ''}`}
-                                      >
-                                        {user?.username || userId}
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                );
-                              })}
-                              {provided.placeholder}
-                              {team.members.length < requiredMembers && (
-                                <div className="drop-hint">
-                                  Arrastra aquí ({requiredMembers - team.members.length} faltan)
-                                </div>
-                              )}
-                            </div>
+            <div className="pm-body">
+              {/* Columna izquierda */}
+              <div className="pm-left">
+                {!isTeamEvent ? (
+                  <>
+                    <p className="pm-section-title">Participantes actuales ({selectedUserIds.size})</p>
+                    <div className="pm-current-participants">
+                      {eventParticipants.length === 0
+                        ? <span className="pm-no-participants">Sin participantes. Selecciona usuarios de la derecha.</span>
+                        : eventParticipants.map(p => (
+                          <div key={p.id} className="pm-participant-chip">
+                            <Avatar user={p} />
+                            <span>{p.username || p.name}</span>
                           </div>
-                        )}
-                      </Droppable>
-                    ))}
+                        ))
+                      }
                     </div>
-                  </div>
-
-                  {/* Zona de eliminación */}
-                  <Droppable droppableId="remove-zone" direction="horizontal">
-                    {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="remove-zone"
+                  </>
+                ) : (
+                  <>
+                    <div className="pm-teams-header">
+                      <p className="pm-section-title" style={{ margin: 0 }}>Equipos ({teams.length})</p>
+                      <button
+                        className="btn-table-action btn-table-edit"
+                        style={{ padding: '5px 12px' }}
+                        onClick={() => setTeams(t => [...t, { id: `team-${Date.now()}`, name: `Equipo ${t.length + 1}`, members: [] }])}
                       >
-                        <X size={24} />
-                        <span>Eliminar</span>
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </div>
-              ) : (
-                /* Vista Individual */
-                <div className="individual-view">
-                  <h3>Participantes Actuales ({eventParticipants.length})</h3>
-                  {eventParticipants.length === 0 ? (
-                    <p className="no-participants">No hay participantes agregados aún</p>
-                  ) : (
-                    <div className="participants-list">
-                      {eventParticipants.map(p => (
-                        <div key={p.id} className="participant-badge">
-                          <span>{p.username || p.name}</span>
-                        </div>
+                        <Plus size={12} /> Equipo
+                      </button>
+                    </div>
+                    <div className="pm-teams-grid">
+                      {teams.map(team => (
+                        <Droppable key={team.id} droppableId={team.id}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.droppableProps}
+                              className={`pm-team-zone${snapshot.isDraggingOver ? ' dragging-over' : ''}${team.members.length === required ? ' complete' : ''}`}
+                            >
+                              <div className="pm-team-header">
+                                <h4>{team.name} ({team.members.length}/{required})</h4>
+                                {teams.length > 1 && (
+                                  <button className="pm-remove-team" onClick={() => setTeams(t => t.filter(x => x.id !== team.id))}>
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </div>
+                              {team.members.map((uid, i) => (
+                                <Draggable key={uid} draggableId={uid} index={i}>
+                                  {(p2, s2) => (
+                                    <div ref={p2.innerRef} {...p2.draggableProps} {...p2.dragHandleProps} className={`pm-draggable-member${s2.isDragging ? ' dragging' : ''}`}>
+                                      {usersMap.get(uid)?.username || uid}
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                              {team.members.length < required && (
+                                <div className="pm-drop-hint">Arrastra aquí ({required - team.members.length} faltan)</div>
+                              )}
+                            </div>
+                          )}
+                        </Droppable>
                       ))}
                     </div>
-                  )}
-                </div>
-              )}
+                    <Droppable droppableId="remove-zone" direction="horizontal">
+                      {(provided) => (
+                        <div ref={provided.innerRef} {...provided.droppableProps} className="pm-remove-zone">
+                          <X size={16} /><span>Quitar del equipo</span>{provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </>
+                )}
+              </div>
 
-              {/* Lista de Usuarios Disponibles */}
-              <div className="available-users-section">
-                <h3>Usuarios Disponibles</h3>
-                <div className="search-box">
-                  <Search size={20} />
-                  <input
-                    type="text"
-                    placeholder="Buscar usuarios..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+              {/* Columna derecha — usuarios disponibles */}
+              <div className="pm-right">
+                <p className="pm-section-title">Usuarios Disponibles</p>
+                <div className="pm-search">
+                  <Search size={14} />
+                  <input type="text" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-                
+
                 {isTeamEvent ? (
-                  <Droppable droppableId="available-users" direction="vertical">
+                  <Droppable droppableId="available-users">
                     {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="users-list-droppable"
-                      >
-                        {filteredUsers.map((user, index) => (
-                          <Draggable key={user.id} draggableId={user.id} index={index}>
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className={`draggable-user ${snapshot.isDragging ? 'dragging' : ''}`}
-                              >
-                                {user.username}
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="pm-users-list">
+                        {filteredUsers.length === 0 && <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', padding: 8 }}>Sin usuarios disponibles</span>}
+                        {filteredUsers.map((u, i) => (
+                          <Draggable key={u.id} draggableId={u.id} index={i}>
+                            {(p2, s2) => (
+                              <div ref={p2.innerRef} {...p2.draggableProps} {...p2.dragHandleProps} className={`pm-draggable-user${s2.isDragging ? ' dragging' : ''}`}>
+                                {u.username}
                               </div>
                             )}
                           </Draggable>
@@ -489,23 +277,24 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
                     )}
                   </Droppable>
                 ) : (
-                  <div className="users-list-checkbox">
-                    {filteredUsers.map(user => (
-                      <label key={user.id} className="checkbox-label">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedUserIds.has(user.id)}
-                          onChange={(e) => {
-                            const newSelected = new Set(selectedUserIds);
-                            if (e.target.checked) {
-                              newSelected.add(user.id);
-                            } else {
-                              newSelected.delete(user.id);
-                            }
-                            setSelectedUserIds(newSelected);
+                  <div className="pm-users-list">
+                    {filteredUsers.length === 0 && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', padding: 8 }}>
+                        {users.length === 0 ? 'No hay usuarios con rol APOSTADOR o superior.' : 'Sin resultados'}
+                      </span>
+                    )}
+                    {filteredUsers.map(u => (
+                      <label key={u.id} className={`pm-user-item${selectedUserIds.has(u.id) ? ' selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.has(u.id)}
+                          onChange={e => {
+                            const next = new Set(selectedUserIds);
+                            e.target.checked ? next.add(u.id) : next.delete(u.id);
+                            setSelectedUserIds(next);
                           }}
                         />
-                        {user.username}
+                        <span className="pm-user-name">{u.username}</span>
                       </label>
                     ))}
                   </div>
@@ -515,11 +304,10 @@ const ParticipantsModal = ({ event, isOpen, onClose, onUpdate }) => {
           </DragDropContext>
         )}
 
-        <div className="modal-actions">
-          <button onClick={onClose} className="btn-cancel">
-            Cerrar
-          </button>
-          <button onClick={handleSave} className="btn-save" disabled={loading}>
+        {/* Footer */}
+        <div className="pm-footer">
+          <button onClick={onClose} className="btn-cancel" style={{ padding: '8px 18px' }}>Cancelar</button>
+          <button onClick={handleSave} className="btn-save" disabled={loading} style={{ padding: '8px 20px' }}>
             {loading ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
